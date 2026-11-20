@@ -1,3 +1,5 @@
+import { isTestMode, resolveTestProvisioningConfig } from "./test-mode.js";
+
 export const PROVISIONING_SECRET_HEADER = "x-fixmate-provisioning-secret";
 const PROVISIONING_PATH = "/api/internal/users";
 
@@ -72,6 +74,14 @@ export function createProvisioningClient({
 }
 
 export function provisionApplicationUser(input) {
+  if (isTestMode()) {
+    const config = resolveTestProvisioningConfig();
+    return createProvisioningClient({
+      endpoint: new URL(PROVISIONING_PATH, `${config.serverApiOrigin}/`).toString(),
+      secret: config.secret,
+    })(input);
+  }
+
   return createProvisioningClient({
     endpoint: resolveEndpoint(),
     secret: resolveSecret(),

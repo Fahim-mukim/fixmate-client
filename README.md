@@ -1,5 +1,9 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
 
+## Isolated authentication test mode
+
+Phase 5E adds a fail-closed test configuration path. Set `FIXMATE_TEST_MODE=true` only with the test-only variables documented in `.env.example` and the workspace `AUTH_TEST_ENVIRONMENT.md`. Test mode requires `FIXMATE_TEST_MONGODB_URI` with an explicit `/fixmate_auth_test` path, `FIXMATE_TEST_DATABASE_NAME=fixmate_auth_test`, test-only Better Auth and provisioning values, and a test-only Server API origin. It rejects `NODE_ENV=production` and never falls back to the normal `MONGODB_URI`, `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`, `FIXMATE_SERVER_API_URL`, or `FIXMATE_PROVISIONING_SECRET` values. Keep real values out of Git.
+
 ## Getting Started
 
 First, run the development server:

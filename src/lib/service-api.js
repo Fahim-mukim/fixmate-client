@@ -1,21 +1,9 @@
 import { connection } from "next/server";
 
 import { isValidServiceId } from "@/lib/service-utils";
+import { resolveServiceApiOrigin } from "@/lib/test-mode.js";
 
 const REQUEST_TIMEOUT_MS = 7000;
-
-function resolveApiOrigin() {
-  const configured = process.env.FIXMATE_SERVER_API_URL;
-  if (!configured) return null;
-
-  try {
-    const url = new URL(configured);
-    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
-    return url;
-  } catch (_) {
-    return null;
-  }
-}
 
 function safeInteger(value) {
   return Number.isSafeInteger(value) && value >= 0 ? value : null;
@@ -25,7 +13,7 @@ async function requestJson(path) {
   // Next.js 16 evaluates non-public env vars at runtime only after this request boundary.
   await connection();
 
-  const origin = resolveApiOrigin();
+  const origin = resolveServiceApiOrigin();
   if (!origin) {
     return {
       ok: false,

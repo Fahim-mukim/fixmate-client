@@ -3,29 +3,20 @@ import { jwt } from "better-auth/plugins/jwt";
 import { MongoClient } from "mongodb";
 import { mongodbAdapter } from "@better-auth/mongo-adapter";
 
-import { canonicalAuthOrigin } from "./auth-origin.js";
 import {
   deriveApplicationRole,
   isRegistrationRole,
   registrationRoleSchema,
 } from "./registration.js";
 import { provisionApplicationUser } from "./provisioning-client.js";
+import { resolveAuthConfig } from "./test-mode.js";
 
-function requiredEnvironmentValue(name) {
-  const value = process.env[name];
-  if (typeof value !== "string" || value.trim() === "") {
-    throw new Error(`${name} is required.`);
-  }
-  return value.trim();
-}
+const authConfig = resolveAuthConfig();
+const client = new MongoClient(authConfig.mongodbUri);
+const db = client.db(authConfig.databaseName);
 
-const authOrigin = canonicalAuthOrigin();
-const mongoUri = requiredEnvironmentValue("MONGODB_URI");
-const client = new MongoClient(mongoUri);
-const db = client.db("fixmate");
-
-export const auth = betterAuth({
-  baseURL: authOrigin,
+const betterAuthConfig = {
+  baseURL: authConfig.authOrigin,
   database: mongodbAdapter(db, {
     client,
   }),
@@ -56,8 +47,8 @@ export const auth = betterAuth({
   plugins: [
     jwt({
       jwt: {
-        issuer: authOrigin,
-        audience: authOrigin,
+        issuer: authConfig.authOrigin,
+        audience: authConfig.authOrigin,
         // Authorization claims are deliberately omitted. Express re-reads the
         // authoritative application user from MongoDB on every request.
         definePayload: () => ({}),
@@ -102,4 +93,10 @@ export const auth = betterAuth({
       },
     },
   },
-});
+};
+
+if (authConfig.betterAuthSecret !== null) {
+  betterAuthConfig.secret = authConfig.betterAuthSecret;
+}
+
+export const auth = betterAuth(betterAuthConfig);
