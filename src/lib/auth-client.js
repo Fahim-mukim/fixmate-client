@@ -1,6 +1,14 @@
-import { createAuthClient } from "better-auth/react"
+import { createAuthClient } from "better-auth/react";
+import { jwtClient } from "better-auth/client/plugins";
+
+// Single canonical browser client. It uses the same-origin Better Auth API route,
+// so no public URL or private credential is embedded in browser code.
 export const authClient = createAuthClient({
-    /** The base URL of the server (optional if you're using the same domain) */
-    baseURL: "http://localhost:3000"
-})
-export const { signIn, signUp, useSession } = createAuthClient()
+  plugins: [
+    jwtClient({
+      jwks: { jwksPath: "/jwks" },
+    }),
+  ],
+});
+
+export const { signIn, signUp, signOut, useSession, getSession } = authClient;
