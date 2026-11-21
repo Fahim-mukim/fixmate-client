@@ -8,15 +8,24 @@ import {
   isRegistrationRole,
   registrationRoleSchema,
 } from "./registration.js";
+import { canonicalAuthOrigin } from "./auth-origin.js";
 import { provisionApplicationUser } from "./provisioning-client.js";
-import { resolveAuthConfig } from "./test-mode.js";
 
-const authConfig = resolveAuthConfig();
-const client = new MongoClient(authConfig.mongodbUri);
-const db = client.db(authConfig.databaseName);
+const DEFAULT_DATABASE_NAME = "fixmate";
+
+const mongodbUri = typeof process.env.MONGODB_URI === "string"
+  ? process.env.MONGODB_URI.trim()
+  : "";
+if (!mongodbUri) {
+  throw new Error("MONGODB_URI is required.");
+}
+
+const authOrigin = canonicalAuthOrigin();
+const client = new MongoClient(mongodbUri);
+const db = client.db(DEFAULT_DATABASE_NAME);
 
 const betterAuthConfig = {
-  baseURL: authConfig.authOrigin,
+  baseURL: authOrigin,
   database: mongodbAdapter(db, {
     client,
   }),
@@ -47,8 +56,8 @@ const betterAuthConfig = {
   plugins: [
     jwt({
       jwt: {
-        issuer: authConfig.authOrigin,
-        audience: authConfig.authOrigin,
+        issuer: authOrigin,
+        audience: authOrigin,
         // Authorization claims are deliberately omitted. Express re-reads the
         // authoritative application user from MongoDB on every request.
         definePayload: () => ({}),
@@ -94,9 +103,5 @@ const betterAuthConfig = {
     },
   },
 };
-
-if (authConfig.betterAuthSecret !== null) {
-  betterAuthConfig.secret = authConfig.betterAuthSecret;
-}
 
 export const auth = betterAuth(betterAuthConfig);

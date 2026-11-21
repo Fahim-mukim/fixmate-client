@@ -1,10 +1,29 @@
 import { connection } from "next/server";
 
 import { AUTHORIZATION_HEADER, extractBearerToken } from "@/lib/bearer-auth.js";
-import { resolveProxyApiOrigin } from "@/lib/test-mode.js";
 
 const UPSTREAM_PATH = "/api/auth/me";
 const REQUEST_TIMEOUT_MS = 7000;
+
+function resolveServerApiOrigin() {
+  const configured = process.env.FIXMATE_SERVER_API_URL;
+  if (typeof configured !== "string" || configured.trim() === "") {
+    return null;
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(configured.trim());
+  } catch {
+    return null;
+  }
+
+  if (!["http:", "https:"].includes(parsed.protocol)) return null;
+  if (parsed.username || parsed.password) return null;
+  if (parsed.pathname !== "/" || parsed.search || parsed.hash) return null;
+
+  return parsed.origin;
+}
 
 function errorResponse(status, code, message) {
   return Response.json(
@@ -28,12 +47,7 @@ export async function GET(request) {
     );
   }
 
-  let apiOrigin;
-  try {
-    apiOrigin = resolveProxyApiOrigin();
-  } catch {
-    apiOrigin = null;
-  }
+  const apiOrigin = resolveServerApiOrigin();
   if (!apiOrigin) {
     return errorResponse(
       503,
