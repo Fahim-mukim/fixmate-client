@@ -15,6 +15,7 @@ import {
 } from "@/lib/booking-contract.js";
 import BookingDetail from "./booking-detail.jsx";
 import BookingFilters from "./booking-filters.jsx";
+import CustomerPayNowButton from "./customer-pay-now-button.jsx";
 import {
   BookingEmpty,
   BookingError,
@@ -207,6 +208,8 @@ export default function CustomerBookingsPanel({ compact = false }) {
                     {booking.problemDescription}
                   </p>
                 </div>
+
+                <CustomerPayNowButton booking={booking} role="customer" />
 
                 <BookingDetail
                   booking={booking}

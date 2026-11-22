@@ -3,7 +3,7 @@ import PaymentsPending from "@/components/dashboard/payments-pending.jsx";
 
 export const metadata = {
   title: "Payments",
-  description: "Payment features are pending in this phase.",
+  description: "Start secure Checkout from an eligible completed booking.",
 };
 
 export default function CustomerPaymentsPage() {
@@ -11,7 +11,7 @@ export default function CustomerPaymentsPage() {
     <DashboardGate
       expectedRole="customer"
       title="Payments"
-      description="Payment handling is intentionally outside this phase."
+      description="Use Pay Now on a completed, unpaid booking and review its server-confirmed status."
     >
       <PaymentsPending />
     </DashboardGate>

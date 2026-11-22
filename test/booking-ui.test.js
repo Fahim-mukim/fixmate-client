@@ -57,7 +57,8 @@ test("customer UI exposes cancellation only for requested bookings with confirma
   assert.match(panel, /canCustomerCancel/);
   assert.match(panel, /bookingApi\.cancelBooking/);
   assert.match(panel, /role="alertdialog"/);
-  assert.ok(!panel.includes("Pay now"));
+  assert.match(panel, /<CustomerPayNowButton booking=\{booking\} role="customer" \/>/);
+  assert.ok(!panel.includes("paymentApi.startCheckout"));
 });
 
 test("technician UI follows the allowed transition table and validates final amount", () => {
