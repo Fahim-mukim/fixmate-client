@@ -8,24 +8,29 @@ export default function FixMateLogo({ className = "", priority = false }) {
     <span
       role="img"
       aria-label="FixMate"
-      className={`relative block w-full max-w-34 ${className}`}
+      className={`inline-flex items-center gap-2.5 ${className}`}
     >
-      <Image
-        src={logoForLight}
-        alt=""
-        width={2048}
-        height={1849}
-        priority={priority}
-        className="block h-auto w-full dark:hidden"
-      />
-      <Image
-        src={logoForDark}
-        alt=""
-        width={2048}
-        height={1849}
-        priority={priority}
-        className="hidden h-auto w-full dark:block"
-      />
+      <span className="relative block h-9 w-9 shrink-0 sm:h-10 sm:w-10">
+        <Image
+          src={logoForLight}
+          alt=""
+          width={2048}
+          height={1849}
+          priority={priority}
+          className="block h-full w-full object-contain dark:hidden"
+        />
+        <Image
+          src={logoForDark}
+          alt=""
+          width={2048}
+          height={1849}
+          priority={priority}
+          className="hidden h-full w-full object-contain dark:block"
+        />
+      </span>
+      <span className="text-lg font-bold tracking-tight text-navy dark:text-foreground sm:text-xl">
+        Fix<span className="text-teal-strong dark:text-teal">Mate</span>
+      </span>
     </span>
   );
 }

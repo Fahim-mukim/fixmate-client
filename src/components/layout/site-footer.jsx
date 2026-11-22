@@ -26,7 +26,7 @@ export default function SiteFooter() {
         <div className="flex flex-col gap-8 md:flex-row md:items-start md:justify-between">
           <div className="max-w-sm">
             <Link href="/" aria-label="FixMate home" className="inline-block">
-              <FixMateLogo className="max-w-28" />
+              <FixMateLogo />
             </Link>
             <p className="mt-4 text-sm leading-6 text-muted-foreground">
               A marketplace for discovering approved smart-device and home-appliance repair services.

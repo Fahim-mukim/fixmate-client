@@ -8,7 +8,7 @@ import {
   isRegistrationRole,
   registrationRoleSchema,
 } from "./registration.js";
-import { canonicalAuthOrigin } from "./auth-origin.js";
+import { canonicalAuthOrigin, resolveTrustedOrigins } from "./auth-origin.js";
 
 const DEFAULT_DATABASE_NAME = "fixmate";
 
@@ -20,11 +20,13 @@ if (!mongodbUri) {
 }
 
 const authOrigin = canonicalAuthOrigin();
+const trustedOrigins = resolveTrustedOrigins();
 const client = new MongoClient(mongodbUri);
 const db = client.db(DEFAULT_DATABASE_NAME);
 
 const betterAuthConfig = {
   baseURL: authOrigin,
+  trustedOrigins,
   database: mongodbAdapter(db, {
     client,
   }),

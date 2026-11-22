@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { canonicalAuthOrigin } from "../src/lib/auth-origin.js";
+import { canonicalAuthOrigin, resolveTrustedOrigins } from "../src/lib/auth-origin.js";
 
 test("canonicalAuthOrigin normalizes configured origins", () => {
   assert.equal(
@@ -32,4 +32,27 @@ test("canonicalAuthOrigin rejects missing, malformed, and non-origin URLs", () =
     () => canonicalAuthOrigin({ BETTER_AUTH_URL: "https://client.example.com/app" }),
     /without path, query, or fragment/,
   );
+});
+
+test("resolveTrustedOrigins includes canonical and safe Vercel https origins", () => {
+  const origins = resolveTrustedOrigins({
+    BETTER_AUTH_URL: "https://fixmate-client-snowy.vercel.app",
+    VERCEL_URL: "fixmate-client-snowy-abc123.vercel.app",
+    VERCEL_PROJECT_PRODUCTION_URL: "fixmate-client-snowy.vercel.app",
+  });
+
+  assert.deepEqual(origins, [
+    "https://fixmate-client-snowy.vercel.app",
+    "https://fixmate-client-snowy-abc123.vercel.app",
+  ]);
+});
+
+test("resolveTrustedOrigins ignores unsafe or non-https Vercel origin values", () => {
+  const origins = resolveTrustedOrigins({
+    BETTER_AUTH_URL: "https://fixmate-client-snowy.vercel.app",
+    VERCEL_URL: "http://evil.example.com",
+    VERCEL_PROJECT_PRODUCTION_URL: "https://user:pass@evil.example.com",
+  });
+
+  assert.deepEqual(origins, ["https://fixmate-client-snowy.vercel.app"]);
 });

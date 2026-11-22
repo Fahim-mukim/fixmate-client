@@ -43,13 +43,14 @@ test("primary navigation contains only the public links", () => {
   assert.match(source("src/app/page.js"), /id="how-it-works"/);
 });
 
-test("header renders logged-out actions and a session-aware account menu", () => {
+test("header renders logged-out sign-in action and a session-aware account menu", () => {
   const header = source("src/components/layout/site-header.jsx");
   assert.match(header, /useSession\(\)/);
   assert.match(header, /isPending/);
   assert.match(header, /loggedIn \? \(\s*<AccountMenu/);
   assert.match(header, /href="\/sign-in"/);
-  assert.match(header, /href="\/sign-up"/);
+  assert.match(header, />\s*Sign In\s*</);
+  assert.ok(!/href="\/sign-up"/.test(header), "logged-out navbar must not include a Sign Up action");
   assert.match(header, /id="mobile-navigation"/);
   assert.match(header, /getCurrentApplicationUser\(\)/);
   assert.match(header, /useSessionIdentity\(\)/);

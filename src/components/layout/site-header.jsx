@@ -92,14 +92,9 @@ export default function SiteHeader() {
           {loggedIn ? (
             <AccountMenu identity={identity} sessionUser={sessionUser} />
           ) : (
-            <>
-              <ButtonLink href="/sign-in" variant="outline" size="sm" className="hidden sm:inline-flex">
-                Sign in
-              </ButtonLink>
-              <ButtonLink href="/sign-up" size="sm" className="hidden sm:inline-flex">
-                Sign up
-              </ButtonLink>
-            </>
+            <ButtonLink href="/sign-in" variant="outline" size="sm" className="hidden sm:inline-flex">
+              Sign In
+            </ButtonLink>
           )}
           <button
             type="button"
@@ -145,21 +140,14 @@ export default function SiteHeader() {
                 </li>
               ))}
               {!loggedIn ? (
-                <li className="grid gap-2 pt-1 sm:hidden">
+                <li className="pt-1 sm:hidden">
                   <ButtonLink
                     href="/sign-in"
                     variant="outline"
                     className="w-full"
                     onClick={() => setMenuOpen(false)}
                   >
-                    Sign in
-                  </ButtonLink>
-                  <ButtonLink
-                    href="/sign-up"
-                    className="w-full"
-                    onClick={() => setMenuOpen(false)}
-                  >
-                    Sign up
+                    Sign In
                   </ButtonLink>
                 </li>
               ) : null}
