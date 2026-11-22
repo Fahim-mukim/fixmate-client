@@ -1,7 +1,9 @@
 import { createAuthenticatedFetch } from "./authenticated-api.js";
 import {
+  ADMIN_PAYMENTS_PROXY_PATH,
   CHECKOUT_PROXY_PATH,
   SESSION_PROXY_PATH,
+  buildAdminPaymentQuery,
   isValidCheckoutSessionId,
   isValidObjectId,
 } from "./payment-contract.js";
@@ -75,5 +77,23 @@ export function createPaymentApiClient({
     });
   }
 
-  return Object.freeze({ startCheckout, getSessionPayment });
+  // Read-only Admin list. The browser supplies validated filters only; role,
+  // ownership, and payment state remain Server-owned.
+  function listAdminPayments(options = {}) {
+    const query = buildAdminPaymentQuery(options);
+    if (query === null) {
+      return Promise.resolve({
+        ok: false,
+        status: 400,
+        code: "INVALID_QUERY",
+        message: "The payments query is not supported.",
+      });
+    }
+
+    return request(`${ADMIN_PAYMENTS_PROXY_PATH}${query ? `?${query}` : ""}`, {
+      method: "GET",
+    });
+  }
+
+  return Object.freeze({ startCheckout, getSessionPayment, listAdminPayments });
 }

@@ -35,6 +35,7 @@ export const MAX_PAYMENT_SEARCH_LENGTH = 100;
 export const MAX_CHECKOUT_SESSION_ID_LENGTH = 255;
 export const MAX_QUERY_PAGE = 100000;
 export const MAX_QUERY_LIMIT = 50;
+export const DEFAULT_ADMIN_PAYMENT_LIMIT = 10;
 
 const CHECKOUT_SESSION_ID_PATTERN = /^cs_(?:test|live)_[A-Za-z0-9]{6,255}$/;
 const UNSAFE_SEARCH_PATTERN = /[$[\]{}]|\u0000/;
@@ -157,4 +158,27 @@ export function resolveAdminPaymentQuery(searchParams) {
   }
 
   return query;
+}
+
+// Browser-side guard for the Admin list. Unknown keys are dropped, unsupported
+// values fail closed, and the BFF/Server still repeat every validation check.
+export function buildAdminPaymentQuery({
+  page = 1,
+  limit = DEFAULT_ADMIN_PAYMENT_LIMIT,
+  status = "",
+  search = "",
+  sort = "newest",
+} = {}) {
+  const params = new URLSearchParams();
+  const values = { page, limit, status, search, sort };
+
+  for (const key of ADMIN_PAYMENT_QUERY_KEYS) {
+    const value = values[key];
+    if (value === undefined || value === null) continue;
+    const text = typeof value === "string" ? value.trim() : String(value);
+    if (text !== "") params.set(key, text);
+  }
+
+  const query = resolveAdminPaymentQuery(params);
+  return query ? query.toString() : null;
 }

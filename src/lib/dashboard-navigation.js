@@ -25,6 +25,7 @@ const DASHBOARD_LINKS = Object.freeze({
     { href: "/dashboard/admin/bookings", label: "Bookings" },
     { href: "/dashboard/admin/services", label: "Services" },
     { href: "/dashboard/admin/users", label: "Users" },
+    { href: "/dashboard/admin/transactions", label: "Transactions" },
     PROFILE_LINK,
   ]),
 });
