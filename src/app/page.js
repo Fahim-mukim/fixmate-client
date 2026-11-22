@@ -20,7 +20,7 @@ const steps = [
   {
     icon: Wrench,
     title: "Request",
-    description: "When booking is enabled, customers will submit repair requests for a selected service.",
+    description: "Sign in as a customer, choose an approved service, and submit a repair request with the job details.",
   },
   {
     icon: CreditCard,
@@ -110,7 +110,7 @@ export default function HomePage() {
             id="how-it-works-heading"
             eyebrow="How it works"
             title="A straightforward repair journey"
-            description="Customers can request a service and follow its status; payment actions are added in a later phase."
+            description="Request an approved service, follow job progress, and pay securely after the technician completes the work."
           />
           <ol className="grid gap-5 md:grid-cols-3">
             {steps.map((step, index) => (

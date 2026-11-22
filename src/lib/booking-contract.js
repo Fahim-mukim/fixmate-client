@@ -7,6 +7,8 @@ export const BOOKING_STATUSES = Object.freeze([
   "cancelled",
 ]);
 
+export const BOOKING_PAYMENT_STATUSES = Object.freeze(["unpaid", "paid"]);
+
 export const ACTIVE_BOOKING_STATUSES = Object.freeze([
   "requested",
   "accepted",
@@ -232,9 +234,15 @@ export function getBookingFormVisibility(role) {
   };
 }
 
-export function buildBookingListQuery({ status, page, limit } = {}) {
+export function buildBookingListQuery({ status, paymentStatus, search, page, limit } = {}) {
   const query = {};
   if (BOOKING_STATUSES.includes(status)) query.status = status;
+  if (BOOKING_PAYMENT_STATUSES.includes(paymentStatus)) query.paymentStatus = paymentStatus;
+
+  if (typeof search === "string") {
+    const normalizedSearch = search.trim().slice(0, 100);
+    if (normalizedSearch) query.search = normalizedSearch;
+  }
 
   const parsedPage = Number(page);
   if (Number.isSafeInteger(parsedPage) && parsedPage >= 1) query.page = parsedPage;

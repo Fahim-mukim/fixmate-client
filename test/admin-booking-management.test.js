@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { buildBookingListQuery } from "../src/lib/booking-contract.js";
 import { AUTHORIZATION_HEADER } from "../src/lib/bearer-auth.js";
 import {
+  ADMIN_BOOKING_QUERY_KEYS,
   BOOKINGS_PROXY_PATH,
   createBookingProxyHandler,
   resolveBookingQuery,
@@ -57,12 +58,21 @@ test("booking BFF exposes the admin list only and rejects admin mutation shapes"
   assert.equal(resolveUpstreamPath("DELETE", ["507f1f77bcf86cd799439012"]), null);
 });
 
-test("admin booking query accepts only documented status, page and limit values", () => {
+test("admin booking query accepts documented admin filters and rejects unsupported keys", () => {
   const valid = resolveBookingQuery(
     new URLSearchParams("status=completed&page=2&limit=12"),
   );
   assert.equal(valid.toString(), "status=completed&page=2&limit=12");
   assert.equal(resolveBookingQuery(new URLSearchParams()).toString(), "");
+
+  const adminValid = resolveBookingQuery(
+    new URLSearchParams("status=completed&paymentStatus=paid&search=smartphone&page=2&limit=12"),
+    { allowedKeys: ADMIN_BOOKING_QUERY_KEYS },
+  );
+  assert.equal(
+    adminValid.toString(),
+    "status=completed&paymentStatus=paid&search=smartphone&page=2&limit=12",
+  );
 
   for (const rejected of [
     "paymentStatus=paid",
@@ -76,6 +86,21 @@ test("admin booking query accepts only documented status, page and limit values"
     "limit=51",
   ]) {
     assert.equal(resolveBookingQuery(new URLSearchParams(rejected)), null, rejected);
+  }
+
+  for (const rejectedAdmin of [
+    "customerId=spoof",
+    "paymentStatus=pending",
+    "status=unknown",
+    "search=%00bad",
+  ]) {
+    assert.equal(
+      resolveBookingQuery(new URLSearchParams(rejectedAdmin), {
+        allowedKeys: ADMIN_BOOKING_QUERY_KEYS,
+      }),
+      null,
+      rejectedAdmin,
+    );
   }
 });
 
@@ -138,7 +163,7 @@ test("admin booking BFF rejects missing auth and invalid queries before calling 
     method: "GET",
     segments: ["admin"],
     authorization: "Bearer admin-token",
-    searchParams: new URLSearchParams("paymentStatus=paid"),
+    searchParams: new URLSearchParams("customerId=spoof"),
   });
 
   assert.equal(unauthenticated.status, 401);
@@ -168,23 +193,33 @@ test("admin booking BFF caps oversized upstream responses", async () => {
   assert.equal((await response.json()).error.code, "RESPONSE_TOO_LARGE");
 });
 
-test("admin booking client sends no mutations and drops unsupported filters", () => {
+test("admin booking client stays read-only and supports documented filters", () => {
   const query = buildBookingListQuery({
     status: "completed",
+    paymentStatus: "paid",
+    search: "  phone  ",
     page: 2,
     limit: 12,
-    paymentStatus: "paid",
-    search: "phone",
     customerId: "spoof",
   });
-  assert.deepEqual(query, { status: "completed", page: 2, limit: 12 });
+  assert.deepEqual(query, {
+    status: "completed",
+    paymentStatus: "paid",
+    search: "phone",
+    page: 2,
+    limit: 12,
+  });
 
   const panel = source("src/components/dashboard/admin-bookings-panel.jsx");
   const apiCalls = panel.match(/bookingApi\.\w+/g) ?? [];
   assert.deepEqual([...new Set(apiCalls)], ["bookingApi.listAdminBookings"]);
   assert.ok(!panel.includes("PATCH"));
   assert.ok(!panel.includes("DELETE"));
-  assert.ok(!panel.includes("paymentStatus:"));
+  assert.ok(panel.includes("paymentStatus:"));
+  assert.ok(panel.includes("showPaymentStatus"));
+  assert.ok(panel.includes("showSearch"));
+  assert.match(panel, /<table[\s\S]*Booking status[\s\S]*Payment/);
+  assert.match(panel, /BookingDetail booking=\{booking\} role="admin"/);
 
   assert.match(BOOKINGS_PROXY_PATH, /^\/api\/fixmate\/bookings$/);
 });
@@ -207,7 +242,9 @@ test("admin booking UI covers list, states, filters, image, pagination and detai
     "bookingPaymentLabel(booking.paymentStatus)",
     "formatBookingDate(booking.preferredDate)",
     "booking.finalAmount ?? booking.basePrice",
-    "sm:grid-cols-2 xl:grid-cols-4",
+    "sm:grid-cols-2",
+    "<table",
+    "Booking status",
   ]) {
     assert.ok(panel.includes(token), `Admin booking panel is missing ${token}`);
   }

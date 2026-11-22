@@ -11,6 +11,14 @@ const footerLinks = [
   { href: "/sign-up", label: "Create account" },
 ];
 
+function XSocialIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...props}>
+      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+    </svg>
+  );
+}
+
 export default function SiteFooter() {
   return (
     <footer className="mt-auto border-t border-border bg-surface">
@@ -23,6 +31,16 @@ export default function SiteFooter() {
             <p className="mt-4 text-sm leading-6 text-muted-foreground">
               A marketplace for discovering approved smart-device and home-appliance repair services.
             </p>
+            <a
+              href="https://x.com/fixmate"
+              target="_blank"
+              rel="noreferrer noopener"
+              className="mt-4 inline-flex items-center gap-2 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+              aria-label="FixMate on X"
+            >
+              <XSocialIcon className="size-4" />
+              <span>X</span>
+            </a>
           </div>
 
           <nav aria-label="Footer navigation">
@@ -43,7 +61,7 @@ export default function SiteFooter() {
         </div>
 
         <p className="mt-10 border-t border-border pt-6 text-xs text-muted-foreground">
-          FixMate marketplace. Booking requests are available to signed-in customers; payment processing is pending.
+          &copy; 2026 FixMate. Approved repair services, tracked booking requests, and secure payment after job completion.
         </p>
       </PageContainer>
     </footer>

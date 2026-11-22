@@ -64,6 +64,7 @@ export default async function ServiceDetail({ params }) {
     service.technicianName,
     "Technician not provided"
   );
+  const technicianEmail = textOrFallback(service.technicianEmail, "");
   const mode = textOrFallback(service.serviceMode, "Service mode not provided");
   const area = textOrFallback(service.serviceArea, "Service area not provided");
   const duration = textOrFallback(
@@ -136,6 +137,8 @@ export default async function ServiceDetail({ params }) {
             <DetailRow label="Service mode" value={mode} />
             <DetailRow label="Estimated duration" value={duration} />
             <DetailRow label="Service area" value={area} />
+            <DetailRow label="Technician" value={technician} />
+            {technicianEmail ? <DetailRow label="Technician email" value={technicianEmail} /> : null}
           </dl>
 
           <BookingRequestPanel serviceId={id} serviceTitle={title} />

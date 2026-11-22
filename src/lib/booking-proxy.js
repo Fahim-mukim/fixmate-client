@@ -1,9 +1,20 @@
 import { AUTHORIZATION_HEADER, extractBearerToken } from "./bearer-auth.js";
-import { BOOKING_STATUSES, isValidBookingId } from "./booking-contract.js";
+import {
+  BOOKING_PAYMENT_STATUSES,
+  BOOKING_STATUSES,
+  isValidBookingId,
+} from "./booking-contract.js";
 
 export const BOOKINGS_PROXY_PATH = "/api/fixmate/bookings";
 export const BOOKING_UPSTREAM_PATH = "/api/bookings";
 export const PROXY_QUERY_KEYS = Object.freeze(["status", "page", "limit"]);
+export const ADMIN_BOOKING_QUERY_KEYS = Object.freeze([
+  "status",
+  "paymentStatus",
+  "search",
+  "page",
+  "limit",
+]);
 const REQUEST_TIMEOUT_MS = 7000;
 const MAX_RESPONSE_LENGTH = 1024 * 1024;
 const MAX_QUERY_PAGE = 100000;
@@ -40,7 +51,7 @@ function parseBoundedInteger(value, maximum) {
   return value;
 }
 
-export function resolveBookingQuery(searchParams) {
+export function resolveBookingQuery(searchParams, { allowedKeys = PROXY_QUERY_KEYS } = {}) {
   const params =
     searchParams instanceof URLSearchParams
       ? searchParams
@@ -48,13 +59,27 @@ export function resolveBookingQuery(searchParams) {
 
   const seen = new Set();
   for (const key of params.keys()) {
-    if (!PROXY_QUERY_KEYS.includes(key) || seen.has(key)) return null;
+    if (!allowedKeys.includes(key) || seen.has(key)) return null;
     seen.add(key);
   }
 
   const status = params.get("status");
   if (status !== null && status !== "" && !BOOKING_STATUSES.includes(status)) {
     return null;
+  }
+
+  const paymentStatus = params.get("paymentStatus");
+  if (
+    paymentStatus !== null &&
+    paymentStatus !== "" &&
+    !BOOKING_PAYMENT_STATUSES.includes(paymentStatus)
+  ) {
+    return null;
+  }
+
+  const search = params.get("search");
+  if (search !== null) {
+    if (search.length > 100 || search.includes("\u0000")) return null;
   }
 
   const page = parseBoundedInteger(params.get("page"), MAX_QUERY_PAGE);
@@ -68,6 +93,8 @@ export function resolveBookingQuery(searchParams) {
 
   const query = new URLSearchParams();
   if (status) query.set("status", status);
+  if (paymentStatus) query.set("paymentStatus", paymentStatus);
+  if (search) query.set("search", search);
   if (page !== null) query.set("page", page);
   if (limit !== null) query.set("limit", limit);
   return query;
@@ -176,9 +203,12 @@ export function createBookingProxyHandler({
       return errorResponse(404, "BOOKING_ROUTE_NOT_FOUND", "Booking route not found.");
     }
 
-    const query = method === "GET"
-      ? resolveBookingQuery(searchParams)
-      : resolveMutationQuery(searchParams);
+    const allowedKeys =
+      method === "GET" && suffix === "/admin" ? ADMIN_BOOKING_QUERY_KEYS : PROXY_QUERY_KEYS;
+    const query =
+      method === "GET"
+        ? resolveBookingQuery(searchParams, { allowedKeys })
+        : resolveMutationQuery(searchParams);
     if (query === null) {
       return errorResponse(400, "INVALID_QUERY", "Booking query is not supported.");
     }
