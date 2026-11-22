@@ -1,9 +1,9 @@
+import CustomerPaymentHistory from "@/components/dashboard/customer-payment-history.jsx";
 import DashboardGate from "@/components/dashboard/dashboard-gate.jsx";
-import PaymentsPending from "@/components/dashboard/payments-pending.jsx";
 
 export const metadata = {
   title: "Payments",
-  description: "Start secure Checkout from an eligible completed booking.",
+  description: "Review your server-confirmed payment history.",
 };
 
 export default function CustomerPaymentsPage() {
@@ -11,9 +11,9 @@ export default function CustomerPaymentsPage() {
     <DashboardGate
       expectedRole="customer"
       title="Payments"
-      description="Use Pay Now on a completed, unpaid booking and review its server-confirmed status."
+      description="Review your payment history and the server-confirmed status of each payment."
     >
-      <PaymentsPending />
+      <CustomerPaymentHistory />
     </DashboardGate>
   );
 }

@@ -8,16 +8,20 @@ import {
   BOOKING_PAYMENT_STATUSES,
   CHECKOUT_PROXY_PATH,
   CHECKOUT_UPSTREAM_PATH,
+  CUSTOMER_PAYMENT_HISTORY_PROXY_PATH,
+  CUSTOMER_PAYMENT_HISTORY_UPSTREAM_PATH,
   PAYMENT_STATUSES,
   SESSION_PROXY_PATH,
   SESSION_UPSTREAM_PATH,
   isValidCheckoutSessionId,
   parseCheckoutBody,
   resolveAdminPaymentQuery,
+  resolveCustomerPaymentHistoryQuery,
 } from "../src/lib/payment-contract.js";
 import {
   createAdminPaymentsProxyHandler,
   createCheckoutProxyHandler,
+  createCustomerPaymentHistoryProxyHandler,
   createSessionProxyHandler,
 } from "../src/lib/payment-proxy.js";
 
@@ -26,6 +30,7 @@ const BOOKING_ID = "507f1f77bcf86cd799439012";
 const PAYMENT_ID = "507f1f77bcf86cd7994390a1";
 const BOOKING_ID_TWO = "507f1f77bcf86cd7994390b2";
 const SESSION_ID = "cs_test_a1b2c3d4e5f6";
+const TRANSACTION_ID = "pi_123456789";
 const CHECKOUT_URL = "https://checkout.stripe.com/c/pay/cs_test_a1b2c3d4e5f6";
 
 function jsonResponse(payload, status = 200) {
@@ -61,6 +66,34 @@ function customerData(overrides = {}) {
   };
 }
 
+function historyRow(overrides = {}) {
+  return {
+    paymentId: PAYMENT_ID,
+    bookingId: BOOKING_ID,
+    serviceTitle: "Smartphone screen repair",
+    technicianName: "Technician One",
+    amount: 95.5,
+    currency: "usd",
+    status: "paid",
+    transactionId: TRANSACTION_ID,
+    paidAt: "2026-11-22T10:04:00.000Z",
+    createdAt: "2026-11-22T10:00:00.000Z",
+    updatedAt: "2026-11-22T10:05:00.000Z",
+    ...overrides,
+  };
+}
+
+function historyData(overrides = {}) {
+  return {
+    items: [historyRow()],
+    total: 12,
+    page: 2,
+    limit: 10,
+    totalPages: 2,
+    ...overrides,
+  };
+}
+
 function adminRow(overrides = {}) {
   return {
     paymentId: PAYMENT_ID,
@@ -72,6 +105,7 @@ function adminRow(overrides = {}) {
     amount: 95.5,
     currency: "usd",
     status: "paid",
+    transactionId: TRANSACTION_ID,
     paidAt: "2026-11-22T10:04:00.000Z",
     createdAt: "2026-11-22T10:00:00.000Z",
     updatedAt: "2026-11-22T10:05:00.000Z",
@@ -86,6 +120,7 @@ function adminData(overrides = {}) {
     page: 3,
     limit: 25,
     totalPages: 1,
+    summary: { currency: "usd", paidCount: 7, totalRevenue: 668.5 },
     ...overrides,
   };
 }
@@ -104,9 +139,14 @@ function captureFetch(payload, status = 200) {
 test("payment BFF contract uses only the documented same-origin and Express paths", () => {
   assert.equal(CHECKOUT_PROXY_PATH, "/api/fixmate/payments/checkout");
   assert.equal(SESSION_PROXY_PATH, "/api/fixmate/payments/session");
+  assert.equal(
+    CUSTOMER_PAYMENT_HISTORY_PROXY_PATH,
+    "/api/fixmate/payments/history",
+  );
   assert.equal(ADMIN_PAYMENTS_PROXY_PATH, "/api/fixmate/payments/admin");
   assert.equal(CHECKOUT_UPSTREAM_PATH, "/api/payments/checkout");
   assert.equal(SESSION_UPSTREAM_PATH, "/api/payments/session");
+  assert.equal(CUSTOMER_PAYMENT_HISTORY_UPSTREAM_PATH, "/api/payments/history");
   assert.equal(ADMIN_PAYMENTS_UPSTREAM_PATH, "/api/payments/admin");
   assert.deepEqual([...PAYMENT_STATUSES], [
     "checkout_pending",
@@ -168,6 +208,40 @@ test("checkout body accepts only a valid bookingId and admin query mirrors the S
     `search=${"x".repeat(101)}`,
   ]) {
     assert.equal(resolveAdminPaymentQuery(new URLSearchParams(query)), null, query);
+  }
+
+  assert.equal(
+    resolveCustomerPaymentHistoryQuery(new URLSearchParams("page=2&limit=10")).toString(),
+    "page=2&limit=10",
+  );
+  assert.equal(
+    resolveCustomerPaymentHistoryQuery(new URLSearchParams("page=2")).toString(),
+    "page=2",
+  );
+  assert.equal(
+    resolveCustomerPaymentHistoryQuery(new URLSearchParams()).toString(),
+    "",
+  );
+
+  for (const query of [
+    "role=admin",
+    "customerId=spoof",
+    "status=paid",
+    "search=Screen",
+    "page=2&page=3",
+    "limit=10&limit=20",
+    "page=0",
+    "page=100001",
+    "limit=0",
+    "limit=51",
+    "page=two",
+    "limit=1.5",
+  ]) {
+    assert.equal(
+      resolveCustomerPaymentHistoryQuery(new URLSearchParams(query)),
+      null,
+      query,
+    );
   }
 });
 
@@ -433,6 +507,131 @@ test("session BFF preserves a safe 404 and rejects oversized or malformed respon
   assert.equal((await oversizedResponse.json()).error.code, "RESPONSE_TOO_LARGE");
 });
 
+test("customer history BFF forwards only pagination and projects verified rows", async () => {
+  const { calls, fetchImpl } = captureFetch({
+    success: true,
+    data: {
+      ...historyData(),
+      internalMarker: "must-not-pass",
+      items: [
+        {
+          ...historyRow(),
+          stripeCheckoutSessionId: "cs_secret_marker",
+          customerEmail: "customer.one@example.test",
+        },
+      ],
+    },
+  });
+  const handle = createCustomerPaymentHistoryProxyHandler({ env: ENV, fetchImpl });
+
+  const response = await handle({
+    authorization: "Bearer signed-token",
+    searchParams: new URLSearchParams("page=2&limit=10"),
+    cookie: "better-auth.session_token=should-not-forward",
+  });
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { success: true, data: historyData() });
+  assert.equal(
+    calls[0].url.toString(),
+    `${ENV.FIXMATE_SERVER_API_URL}${CUSTOMER_PAYMENT_HISTORY_UPSTREAM_PATH}?page=2&limit=10`,
+  );
+  assert.equal(calls[0].init.method, "GET");
+  assert.equal(calls[0].init.body, undefined);
+
+  const headers = new Headers(calls[0].init.headers);
+  assert.equal(headers.get(AUTHORIZATION_HEADER), "Bearer signed-token");
+  assert.equal(headers.get("cookie"), null);
+  assert.equal(headers.get("content-type"), null);
+});
+
+test("customer history BFF rejects overrides, missing auth, and wrong methods before fetching", async () => {
+  let fetchCount = 0;
+  const handle = createCustomerPaymentHistoryProxyHandler({
+    env: ENV,
+    fetchImpl: async () => {
+      fetchCount += 1;
+      return jsonResponse({ success: true, data: historyData() });
+    },
+  });
+
+  for (const query of [
+    "role=admin",
+    "customerId=spoof",
+    "status=paid",
+    "search=Screen",
+    "page=2&page=3",
+    "page=0",
+    "page=100001",
+    "limit=0",
+    "limit=51",
+    "limit=ten",
+  ]) {
+    const response = await handle({
+      authorization: "Bearer signed-token",
+      searchParams: new URLSearchParams(query),
+    });
+    assert.equal(response.status, 400, query);
+  }
+
+  const unauthenticated = await handle({});
+  assert.equal(unauthenticated.status, 401);
+
+  const wrongMethod = await handle({
+    method: "POST",
+    authorization: "Bearer signed-token",
+  });
+  assert.equal(wrongMethod.status, 405);
+  assert.equal(fetchCount, 0);
+});
+
+test("customer history BFF preserves upstream errors and fails closed on malformed rows", async () => {
+  const forbidden = createCustomerPaymentHistoryProxyHandler({
+    env: ENV,
+    fetchImpl: async () =>
+      jsonResponse(
+        {
+          success: false,
+          error: {
+            code: "FORBIDDEN",
+            message: "Customer role required.",
+            internal: "must-not-pass",
+          },
+        },
+        403,
+      ),
+  });
+  const forbiddenResponse = await forbidden({ authorization: "Bearer signed-token" });
+  assert.equal(forbiddenResponse.status, 403);
+  assert.deepEqual(await forbiddenResponse.json(), {
+    success: false,
+    error: { code: "FORBIDDEN", message: "Customer role required." },
+  });
+
+  for (const data of [
+    historyData({ items: [historyRow({ transactionId: "cs_test_not_a_payment_intent" })] }),
+    historyData({ total: -1 }),
+    historyData({ items: {} }),
+  ]) {
+    const handle = createCustomerPaymentHistoryProxyHandler({
+      env: ENV,
+      fetchImpl: async () => jsonResponse({ success: true, data }),
+    });
+    const response = await handle({ authorization: "Bearer signed-token" });
+    assert.equal(response.status, 502);
+    assert.equal((await response.json()).error.code, "INVALID_UPSTREAM_RESPONSE");
+  }
+
+  const oversized = createCustomerPaymentHistoryProxyHandler({
+    env: ENV,
+    fetchImpl: async () =>
+      jsonResponse({ success: true, data: { blob: "x".repeat(1024 * 1024 + 1) } }),
+  });
+  const oversizedResponse = await oversized({ authorization: "Bearer signed-token" });
+  assert.equal(oversizedResponse.status, 502);
+  assert.equal((await oversizedResponse.json()).error.code, "RESPONSE_TOO_LARGE");
+});
+
 test("admin payments BFF forwards only approved queries and preserves pagination", async () => {
   const { calls, fetchImpl } = captureFetch({
     success: true,
@@ -465,6 +664,22 @@ test("admin payments BFF forwards only approved queries and preserves pagination
   assert.equal(headers.get(AUTHORIZATION_HEADER), "Bearer signed-token");
   assert.equal(headers.get("cookie"), null);
   assert.equal(headers.get("content-type"), null);
+});
+
+test("admin payments BFF fails closed when transaction or revenue data is malformed", async () => {
+  for (const data of [
+    adminData({ summary: null }),
+    adminData({ summary: { currency: "usd", paidCount: 7, totalRevenue: -1 } }),
+    adminData({ items: [adminRow({ transactionId: "cs_test_not_a_payment_intent" })] }),
+  ]) {
+    const handle = createAdminPaymentsProxyHandler({
+      env: ENV,
+      fetchImpl: async () => jsonResponse({ success: true, data }),
+    });
+    const response = await handle({ authorization: "Bearer signed-token" });
+    assert.equal(response.status, 502);
+    assert.equal((await response.json()).error.code, "INVALID_UPSTREAM_RESPONSE");
+  }
 });
 
 test("admin payments BFF rejects unknown, duplicate, and malformed queries before fetching", async () => {
@@ -540,6 +755,7 @@ test("all payment BFFs fail closed when the server origin is not configured", as
   };
   const checkout = createCheckoutProxyHandler({ env: {}, fetchImpl });
   const session = createSessionProxyHandler({ env: {}, fetchImpl });
+  const history = createCustomerPaymentHistoryProxyHandler({ env: {}, fetchImpl });
   const admin = createAdminPaymentsProxyHandler({ env: {}, fetchImpl });
 
   const responses = await Promise.all([
@@ -548,6 +764,7 @@ test("all payment BFFs fail closed when the server origin is not configured", as
       body: JSON.stringify({ bookingId: BOOKING_ID }),
     }),
     session({ sessionId: SESSION_ID, authorization: "Bearer signed-token" }),
+    history({ authorization: "Bearer signed-token" }),
     admin({ authorization: "Bearer signed-token" }),
   ]);
 

@@ -4,11 +4,13 @@ import { OBJECT_ID_PATTERN } from "./service-utils.js";
 export const PAYMENT_PROXY_PATH = "/api/fixmate/payments";
 export const CHECKOUT_PROXY_PATH = `${PAYMENT_PROXY_PATH}/checkout`;
 export const SESSION_PROXY_PATH = `${PAYMENT_PROXY_PATH}/session`;
+export const CUSTOMER_PAYMENT_HISTORY_PROXY_PATH = `${PAYMENT_PROXY_PATH}/history`;
 export const ADMIN_PAYMENTS_PROXY_PATH = `${PAYMENT_PROXY_PATH}/admin`;
 
 export const PAYMENT_UPSTREAM_PATH = "/api/payments";
 export const CHECKOUT_UPSTREAM_PATH = `${PAYMENT_UPSTREAM_PATH}/checkout`;
 export const SESSION_UPSTREAM_PATH = `${PAYMENT_UPSTREAM_PATH}/session`;
+export const CUSTOMER_PAYMENT_HISTORY_UPSTREAM_PATH = `${PAYMENT_UPSTREAM_PATH}/history`;
 export const ADMIN_PAYMENTS_UPSTREAM_PATH = `${PAYMENT_UPSTREAM_PATH}/admin`;
 
 // Mirrors the Server's payment model and paymentQuery allowlists.
@@ -30,12 +32,17 @@ export const ADMIN_PAYMENT_QUERY_KEYS = Object.freeze([
   "search",
   "sort",
 ]);
+export const CUSTOMER_PAYMENT_HISTORY_QUERY_KEYS = Object.freeze([
+  "page",
+  "limit",
+]);
 
 export const MAX_PAYMENT_SEARCH_LENGTH = 100;
 export const MAX_CHECKOUT_SESSION_ID_LENGTH = 255;
 export const MAX_QUERY_PAGE = 100000;
 export const MAX_QUERY_LIMIT = 50;
 export const DEFAULT_ADMIN_PAYMENT_LIMIT = 10;
+export const DEFAULT_CUSTOMER_HISTORY_LIMIT = 10;
 
 const CHECKOUT_SESSION_ID_PATTERN = /^cs_(?:test|live)_[A-Za-z0-9]{6,255}$/;
 const UNSAFE_SEARCH_PATTERN = /[$[\]{}]|\u0000/;
@@ -180,5 +187,43 @@ export function buildAdminPaymentQuery({
   }
 
   const query = resolveAdminPaymentQuery(params);
+  return query ? query.toString() : null;
+}
+
+// Customer history accepts only pagination. Ownership and status are derived
+// from the server-side user, never from browser input.
+export function resolveCustomerPaymentHistoryQuery(searchParams) {
+  const params = toSearchParams(searchParams);
+  const seen = new Set();
+
+  for (const key of params.keys()) {
+    if (!CUSTOMER_PAYMENT_HISTORY_QUERY_KEYS.includes(key) || seen.has(key)) {
+      return null;
+    }
+    seen.add(key);
+  }
+
+  const query = new URLSearchParams();
+  for (const key of CUSTOMER_PAYMENT_HISTORY_QUERY_KEYS) {
+    const raw = params.get(key);
+    if (raw === null) continue;
+    const maximum = key === "page" ? MAX_QUERY_PAGE : MAX_QUERY_LIMIT;
+    const parsed = parseBoundedInteger(raw, maximum);
+    if (parsed === null) return null;
+    query.set(key, String(parsed));
+  }
+
+  return query;
+}
+
+export function buildCustomerPaymentHistoryQuery({
+  page = 1,
+  limit = DEFAULT_CUSTOMER_HISTORY_LIMIT,
+} = {}) {
+  const params = new URLSearchParams();
+  if (page !== undefined && page !== null) params.set("page", String(page));
+  if (limit !== undefined && limit !== null) params.set("limit", String(limit));
+
+  const query = resolveCustomerPaymentHistoryQuery(params);
   return query ? query.toString() : null;
 }

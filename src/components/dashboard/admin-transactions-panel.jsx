@@ -15,6 +15,7 @@ import {
   adminPaymentStatusVariant,
   formatAdminPaymentAmount,
   formatAdminPaymentDate,
+  formatTransactionId,
   hasAdminPaymentFilters,
   readAdminPaymentList,
 } from "@/lib/admin-payment-contract.js";
@@ -284,8 +285,38 @@ export default function AdminTransactionsPanel() {
 
         {!loading && !error && data?.items.length > 0 ? (
           <>
-            <p role="status" className="text-sm text-muted-foreground">
-              Total records: {data.total}
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-xl border border-border bg-surface p-4">
+                <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                  Total records
+                </p>
+                <p role="status" className="mt-1 text-xl font-semibold tabular-nums">
+                  {data.total}
+                </p>
+              </div>
+              <div className="rounded-xl border border-border bg-surface p-4">
+                <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                  Completed payments
+                </p>
+                <p className="mt-1 text-xl font-semibold tabular-nums">
+                  {data.summary.paidCount}
+                </p>
+              </div>
+              <div className="rounded-xl border border-border bg-surface p-4">
+                <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                  Total revenue
+                </p>
+                <p className="mt-1 text-xl font-semibold tabular-nums">
+                  {formatAdminPaymentAmount(data.summary.totalRevenue)}{" "}
+                  <span className="text-sm font-normal text-muted-foreground">
+                    {data.summary.currency.toUpperCase()}
+                  </span>
+                </p>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Revenue and completed-payment totals cover every server-verified
+              paid record, independent of the filters above.
             </p>
 
             <div className="hidden overflow-x-auto rounded-xl border border-border bg-surface lg:block">
@@ -305,6 +336,7 @@ export default function AdminTransactionsPanel() {
                     <th scope="col" className="px-4 py-3">Amount</th>
                     <th scope="col" className="px-4 py-3">Currency</th>
                     <th scope="col" className="px-4 py-3">Status</th>
+                    <th scope="col" className="px-4 py-3">Transaction ID</th>
                     <th scope="col" className="px-4 py-3">Paid</th>
                     <th scope="col" className="px-4 py-3">Recorded</th>
                   </tr>
@@ -331,6 +363,9 @@ export default function AdminTransactionsPanel() {
                         {row.currency || "—"}
                       </td>
                       <td className="px-4 py-3"><StatusBadge status={row.status} /></td>
+                      <td className="px-4 py-3 text-xs break-all text-muted-foreground">
+                        {formatTransactionId(row.transactionId)}
+                      </td>
                       <td className="px-4 py-3 text-xs text-muted-foreground">
                         {row.paidAt ? formatAdminPaymentDate(row.paidAt) : "Not paid"}
                       </td>
@@ -371,6 +406,11 @@ export default function AdminTransactionsPanel() {
                         {formatAdminPaymentAmount(row.amount)}
                       </span>{" "}
                       {row.currency || "—"}
+                    </TransactionField>
+                    <TransactionField label="Transaction ID">
+                      <span className="break-all">
+                        {formatTransactionId(row.transactionId)}
+                      </span>
                     </TransactionField>
                     <TransactionField label="Paid">
                       {row.paidAt ? formatAdminPaymentDate(row.paidAt) : "Not paid"}

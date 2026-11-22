@@ -18,7 +18,9 @@ import {
   adminPaymentStatusVariant,
   formatAdminPaymentAmount,
   formatAdminPaymentDate,
+  formatTransactionId,
   hasAdminPaymentFilters,
+  readAdminPaymentSummary,
   readAdminPaymentList,
   readAdminPaymentRow,
 } from "../src/lib/admin-payment-contract.js";
@@ -41,6 +43,7 @@ function safeRow(overrides = {}) {
     amount: 95.5,
     currency: "usd",
     status: "paid",
+    transactionId: "pi_123456789",
     paidAt: CREATED_AT,
     createdAt: CREATED_AT,
     updatedAt: CREATED_AT,
@@ -55,6 +58,7 @@ function safeList(overrides = {}) {
     page: 1,
     limit: DEFAULT_ADMIN_PAYMENT_LIMIT,
     totalPages: 1,
+    summary: { currency: "usd", paidCount: 7, totalRevenue: 668.5 },
     ...overrides,
   };
 }
@@ -192,6 +196,7 @@ test("Admin payment rows project only approved display fields", () => {
   assert.equal(row.customerEmail, "customer@example.com");
   assert.equal(row.amount, 95.5);
   assert.equal(row.status, "paid");
+  assert.equal(row.transactionId, "pi_123456789");
   const serialized = JSON.stringify(row);
   for (const forbidden of [
     "pi_secret_marker",
@@ -212,6 +217,7 @@ test("Admin payment rows project only approved display fields", () => {
   assert.equal(sparse.amount, null);
   assert.equal(sparse.currency, "");
   assert.equal(sparse.status, "");
+  assert.equal(sparse.transactionId, null);
   assert.equal(sparse.paidAt, null);
   assert.equal(sparse.createdAt, null);
   assert.equal(sparse.updatedAt, null);
@@ -232,6 +238,7 @@ test("Admin payment list requires server pagination and fails closed on malforme
     page: 2,
     limit: 10,
     totalPages: 3,
+    summary: { currency: "usd", paidCount: 7, totalRevenue: 668.5 },
   });
 
   for (const data of [
@@ -245,8 +252,30 @@ test("Admin payment list requires server pagination and fails closed on malforme
     safeList({ limit: 51 }),
     safeList({ totalPages: "3" }),
     safeList({ limit: 1, items: [safeRow(), safeRow()] }),
+    safeList({ summary: null }),
+    safeList({ summary: { currency: "usd", paidCount: -1, totalRevenue: 1 } }),
   ]) {
     assert.equal(readAdminPaymentList(data), null, JSON.stringify(data));
+  }
+});
+
+test("Admin payment summary is trusted only when currency, count, and revenue are safe", () => {
+  assert.deepEqual(readAdminPaymentSummary({
+    currency: "usd",
+    paidCount: 7,
+    totalRevenue: 668.5,
+  }), { paidCount: 7, totalRevenue: 668.5, currency: "usd" });
+
+  for (const summary of [
+    null,
+    [],
+    { currency: "usd", paidCount: 7 },
+    { currency: "", paidCount: 7, totalRevenue: 668.5 },
+    { currency: "usd", paidCount: -1, totalRevenue: 668.5 },
+    { currency: "usd", paidCount: 7, totalRevenue: -1 },
+    { currency: "usd", paidCount: 7, totalRevenue: Number.NaN },
+  ]) {
+    assert.equal(readAdminPaymentSummary(summary), null, JSON.stringify(summary));
   }
 });
 
@@ -257,6 +286,11 @@ test("Admin payment formatting uses safe missing values and known status labels"
   assert.match(formatAdminPaymentDate(CREATED_AT), /2026/);
   assert.equal(formatAdminPaymentDate("not-a-date"), "—");
   assert.equal(formatAdminPaymentDate(null), "—");
+
+  assert.equal(formatTransactionId("pi_123456789"), "pi_123456789");
+  assert.equal(formatTransactionId(null), "Unavailable");
+  assert.equal(formatTransactionId("cs_test_a1b2c3d4e5f6"), "Unavailable");
+  assert.equal(formatTransactionId("session_pi_forged"), "Unavailable");
 
   assert.equal(adminPaymentStatusLabel("checkout_pending"), "Checkout started");
   assert.equal(adminPaymentStatusLabel("paid"), "Paid");
@@ -320,8 +354,14 @@ test("Admin transactions panel is read-only and covers filters, states, and safe
     "formatAdminPaymentAmount(row.amount)",
     "row.currency",
     "StatusBadge",
+    "formatTransactionId(row.transactionId)",
+    "Transaction ID",
     'row.paidAt ? formatAdminPaymentDate(row.paidAt) : "Not paid"',
     "formatAdminPaymentDate(recordDate(row))",
+    "data.summary.paidCount",
+    "data.summary.totalRevenue",
+    "data.summary.currency.toUpperCase()",
+    "independent",
     "sm:grid-cols-2",
   ]) {
     assert.ok(panel.includes(token), `Admin transaction panel is missing ${token}`);

@@ -11,15 +11,17 @@ function source(relativePath) {
 
 const CHECKOUT_ROUTE = "src/app/api/fixmate/payments/checkout/route.js";
 const SESSION_ROUTE = "src/app/api/fixmate/payments/session/[sessionId]/route.js";
+const HISTORY_ROUTE = "src/app/api/fixmate/payments/history/route.js";
 const ADMIN_ROUTE = "src/app/api/fixmate/payments/admin/route.js";
 const CONTRACT = "src/lib/payment-contract.js";
 const PROXY = "src/lib/payment-proxy.js";
-const ROUTE_FILES = [CHECKOUT_ROUTE, SESSION_ROUTE, ADMIN_ROUTE];
+const ROUTE_FILES = [CHECKOUT_ROUTE, SESSION_ROUTE, HISTORY_ROUTE, ADMIN_ROUTE];
 const PAYMENT_FILES = [CONTRACT, PROXY, ...ROUTE_FILES];
 
-test("payment BFF route handlers expose exactly the three intended methods", () => {
+test("payment BFF route handlers expose only their intended methods", () => {
   const checkout = source(CHECKOUT_ROUTE);
   const session = source(SESSION_ROUTE);
+  const history = source(HISTORY_ROUTE);
   const admin = source(ADMIN_ROUTE);
 
   assert.match(checkout, /export async function POST\(request\)/);
@@ -29,6 +31,9 @@ test("payment BFF route handlers expose exactly the three intended methods", () 
   assert.doesNotMatch(session, /export async function (?:POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\b/);
   assert.match(session, /const \{ sessionId \} = await context\.params/);
 
+  assert.match(history, /export async function GET\(request\)/);
+  assert.doesNotMatch(history, /export async function (?:POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\b/);
+
   assert.match(admin, /export async function GET\(request\)/);
   assert.doesNotMatch(admin, /export async function (?:POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\b/);
 });
@@ -36,9 +41,10 @@ test("payment BFF route handlers expose exactly the three intended methods", () 
 test("payment route handlers use the established dynamic BFF request pattern", () => {
   const checkout = source(CHECKOUT_ROUTE);
   const session = source(SESSION_ROUTE);
+  const history = source(HISTORY_ROUTE);
   const admin = source(ADMIN_ROUTE);
 
-  for (const route of [checkout, session, admin]) {
+  for (const route of [checkout, session, history, admin]) {
     assert.match(route, /connection\(\)/);
     assert.match(route, /request\.headers\.get\(AUTHORIZATION_HEADER\)/);
     assert.match(route, /new URL\(request\.url\)\.searchParams/);
@@ -49,6 +55,8 @@ test("payment route handlers use the established dynamic BFF request pattern", (
   assert.match(checkout, /createCheckoutProxyHandler/);
   assert.match(session, /sessionId,/);
   assert.match(session, /createSessionProxyHandler/);
+  assert.match(history, /createCustomerPaymentHistoryProxyHandler/);
+  assert.doesNotMatch(history, /body:/);
   assert.match(admin, /createAdminPaymentsProxyHandler/);
   assert.doesNotMatch(admin, /body:/);
 });

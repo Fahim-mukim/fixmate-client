@@ -21,12 +21,14 @@ export const ADMIN_PAYMENT_ROW_FIELDS = Object.freeze([
   "amount",
   "currency",
   "status",
+  "transactionId",
   "paidAt",
   "createdAt",
   "updatedAt",
 ]);
 
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/;
+const TRANSACTION_ID_PATTERN = /^pi_[A-Za-z0-9]{1,252}$/;
 const DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
   year: "numeric",
   month: "short",
@@ -67,6 +69,13 @@ function safeCount(value, minimum, maximum) {
 export function readAdminPaymentRow(row) {
   if (!isPlainObject(row) || !isValidObjectId(row.paymentId)) return null;
 
+  const transactionId =
+    row.transactionId === null ? null
+      : typeof row.transactionId === "string" &&
+          TRANSACTION_ID_PATTERN.test(row.transactionId)
+        ? row.transactionId
+        : null;
+
   return {
     paymentId: row.paymentId,
     serviceTitle: safeText(row.serviceTitle, 200),
@@ -81,10 +90,29 @@ export function readAdminPaymentRow(row) {
         : null,
     currency: safeText(row.currency, 10),
     status: PAYMENT_STATUSES.includes(row.status) ? row.status : "",
+    transactionId,
     paidAt: safeDate(row.paidAt),
     createdAt: safeDate(row.createdAt),
     updatedAt: safeDate(row.updatedAt),
   };
+}
+
+// The KPI is global across server-verified paid payments and is independent
+// of the current status/search filters.
+export function readAdminPaymentSummary(summary) {
+  if (!isPlainObject(summary)) return null;
+
+  const paidCount = safeCount(summary.paidCount, 0, Number.MAX_SAFE_INTEGER);
+  const totalRevenue =
+    typeof summary.totalRevenue === "number" &&
+    Number.isFinite(summary.totalRevenue) &&
+    summary.totalRevenue >= 0
+      ? summary.totalRevenue
+      : null;
+  const currency = safeText(summary.currency, 10);
+
+  if (paidCount === null || totalRevenue === null || !currency) return null;
+  return { paidCount, totalRevenue, currency };
 }
 
 export function readAdminPaymentList(data) {
@@ -98,15 +126,17 @@ export function readAdminPaymentList(data) {
   const page = safeCount(data.page, 1, MAX_QUERY_PAGE);
   const limit = safeCount(data.limit, 1, MAX_QUERY_LIMIT);
   const totalPages = safeCount(data.totalPages, 0, Number.MAX_SAFE_INTEGER);
+  const summary = readAdminPaymentSummary(data.summary);
 
   if (
     [total, page, limit, totalPages].some((value) => value === null) ||
-    items.length > limit
+    items.length > limit ||
+    !summary
   ) {
     return null;
   }
 
-  return { items, total, page, limit, totalPages };
+  return { items, total, page, limit, totalPages, summary };
 }
 
 export function formatAdminPaymentAmount(value) {
@@ -117,6 +147,14 @@ export function formatAdminPaymentAmount(value) {
 export function formatAdminPaymentDate(value) {
   const iso = safeDate(value);
   return iso ? DATE_FORMATTER.format(new Date(iso)) : "—";
+}
+
+// A missing PaymentIntent id is reported as unavailable; no Session id or
+// other identifier is ever substituted.
+export function formatTransactionId(value) {
+  return typeof value === "string" && TRANSACTION_ID_PATTERN.test(value)
+    ? value
+    : "Unavailable";
 }
 
 export function adminPaymentStatusLabel(status) {

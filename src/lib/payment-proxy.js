@@ -4,6 +4,7 @@ import {
   ADMIN_PAYMENTS_UPSTREAM_PATH,
   BOOKING_PAYMENT_STATUSES,
   CHECKOUT_UPSTREAM_PATH,
+  CUSTOMER_PAYMENT_HISTORY_UPSTREAM_PATH,
   MAX_QUERY_LIMIT,
   MAX_QUERY_PAGE,
   PAYMENT_STATUSES,
@@ -13,6 +14,7 @@ import {
   isValidObjectId,
   parseCheckoutBody,
   resolveAdminPaymentQuery,
+  resolveCustomerPaymentHistoryQuery,
 } from "./payment-contract.js";
 
 const REQUEST_TIMEOUT_MS = 7000;
@@ -23,6 +25,7 @@ const MAX_ERROR_MESSAGE_LENGTH = 500;
 const ERROR_CODE_PATTERN = /^[A-Z][A-Z0-9_]{1,127}$/;
 const ERROR_CONTROL_PATTERN = /[\u0000-\u001f\u007f]/;
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/;
+const TRANSACTION_ID_PATTERN = /^pi_[A-Za-z0-9]{1,252}$/;
 
 function errorResponse(status, code, message) {
   return Response.json({ success: false, error: { code, message } }, { status });
@@ -67,6 +70,16 @@ function projectNullableDate(value) {
 function projectInteger(value, { minimum, maximum }) {
   if (typeof value !== "number" || !Number.isSafeInteger(value)) return undefined;
   if (value < minimum || value > maximum) return undefined;
+  return value;
+}
+
+// A transaction reference is strictly the verified PaymentIntent id. A null
+// means it was not recorded; a Checkout Session id is never accepted here.
+function projectTransactionId(value) {
+  if (value === null) return null;
+  if (typeof value !== "string" || !TRANSACTION_ID_PATTERN.test(value)) {
+    return undefined;
+  }
   return value;
 }
 
@@ -153,6 +166,85 @@ function projectCustomerPayment(data) {
   };
 }
 
+function projectCustomerHistoryRow(row) {
+  if (!isPlainObject(row)) return null;
+
+  const fields = {
+    paymentId: row.paymentId,
+    bookingId: row.bookingId,
+    serviceTitle: projectNullableString(row.serviceTitle, 200),
+    technicianName: projectNullableString(row.technicianName, 120),
+    amount: projectNullableNumber(row.amount),
+    currency: projectNullableString(row.currency, 10),
+    status: projectNullableStatus(row.status),
+    transactionId: projectTransactionId(row.transactionId),
+    paidAt: projectNullableDate(row.paidAt),
+    createdAt: projectNullableDate(row.createdAt),
+    updatedAt: projectNullableDate(row.updatedAt),
+  };
+
+  if (
+    !isValidObjectId(fields.paymentId) ||
+    !isValidObjectId(fields.bookingId) ||
+    Object.values(fields).some((value) => value === undefined)
+  ) {
+    return null;
+  }
+
+  return fields;
+}
+
+function projectCustomerHistoryList(data) {
+  if (!isPlainObject(data) || !Array.isArray(data.items)) return null;
+
+  const items = data.items.map(projectCustomerHistoryRow);
+  const total = projectInteger(data.total, {
+    minimum: 0,
+    maximum: Number.MAX_SAFE_INTEGER,
+  });
+  const page = projectInteger(data.page, { minimum: 1, maximum: MAX_QUERY_PAGE });
+  const limit = projectInteger(data.limit, { minimum: 1, maximum: MAX_QUERY_LIMIT });
+  const totalPages = projectInteger(data.totalPages, {
+    minimum: 0,
+    maximum: Number.MAX_SAFE_INTEGER,
+  });
+
+  if (
+    items.some((item) => item === null) ||
+    [total, page, limit, totalPages].some((value) => value === undefined)
+  ) {
+    return null;
+  }
+
+  return { items, total, page, limit, totalPages };
+}
+
+function projectAdminPaymentSummary(summary) {
+  if (!isPlainObject(summary)) return null;
+
+  const currency = projectNullableString(summary.currency, 10);
+  const paidCount = projectInteger(summary.paidCount, {
+    minimum: 0,
+    maximum: Number.MAX_SAFE_INTEGER,
+  });
+  const totalRevenue =
+    typeof summary.totalRevenue === "number" &&
+    Number.isFinite(summary.totalRevenue) &&
+    summary.totalRevenue >= 0
+      ? summary.totalRevenue
+      : undefined;
+
+  if (
+    currency === undefined ||
+    paidCount === undefined ||
+    totalRevenue === undefined
+  ) {
+    return null;
+  }
+
+  return { currency, paidCount, totalRevenue };
+}
+
 function projectAdminPaymentRow(row) {
   if (!isPlainObject(row)) return null;
 
@@ -166,6 +258,7 @@ function projectAdminPaymentRow(row) {
     amount: projectNullableNumber(row.amount),
     currency: projectNullableString(row.currency, 10),
     status: projectNullableStatus(row.status),
+    transactionId: projectTransactionId(row.transactionId),
     paidAt: projectNullableDate(row.paidAt),
     createdAt: projectNullableDate(row.createdAt),
     updatedAt: projectNullableDate(row.updatedAt),
@@ -196,15 +289,17 @@ function projectAdminPaymentList(data) {
     minimum: 0,
     maximum: Number.MAX_SAFE_INTEGER,
   });
+  const summary = projectAdminPaymentSummary(data.summary);
 
   if (
     items.some((item) => item === null) ||
-    [total, page, limit, totalPages].some((value) => value === undefined)
+    [total, page, limit, totalPages].some((value) => value === undefined) ||
+    !summary
   ) {
     return null;
   }
 
-  return { items, total, page, limit, totalPages };
+  return { items, total, page, limit, totalPages, summary };
 }
 
 function projectError(payload) {
@@ -488,6 +583,46 @@ export function createAdminPaymentsProxyHandler(options = {}) {
       token,
       query,
       projectSuccess: projectAdminPaymentList,
+    });
+  };
+}
+
+export function createCustomerPaymentHistoryProxyHandler(options = {}) {
+  const forward = createForwarder(options);
+
+  return async function handleCustomerPaymentHistoryProxy({
+    method = "GET",
+    authorization,
+    searchParams,
+  } = {}) {
+    if (method !== "GET") {
+      return errorResponse(405, "METHOD_NOT_ALLOWED", "Method not allowed.");
+    }
+
+    const token = extractBearerToken(authorization);
+    if (!token) {
+      return errorResponse(
+        401,
+        "AUTHENTICATION_REQUIRED",
+        "Authentication is required.",
+      );
+    }
+
+    const query = resolveCustomerPaymentHistoryQuery(searchParams);
+    if (!query) {
+      return errorResponse(
+        400,
+        "INVALID_QUERY",
+        "The payment history query is not supported.",
+      );
+    }
+
+    return forward({
+      path: CUSTOMER_PAYMENT_HISTORY_UPSTREAM_PATH,
+      method: "GET",
+      token,
+      query,
+      projectSuccess: projectCustomerHistoryList,
     });
   };
 }
