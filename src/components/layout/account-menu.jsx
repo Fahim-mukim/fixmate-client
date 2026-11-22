@@ -13,6 +13,7 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -82,41 +83,47 @@ export default function AccountMenu({ identity, sessionUser }) {
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="end" sideOffset={8} className="w-64">
-        <DropdownMenuLabel className="flex flex-col gap-0.5 py-2">
-          <span className="truncate text-sm font-medium text-foreground">
-            {name || "Your account"}
-          </span>
-          <span className="truncate text-xs font-normal text-muted-foreground">
-            {email || "Signed in"}
-          </span>
-          {role ? (
-            <span className="mt-1 w-fit rounded-full bg-mist px-2 py-0.5 text-[11px] font-semibold text-foreground dark:bg-surface-alt">
-              {roleLabel(role)}
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="flex flex-col gap-0.5 py-2">
+            <span className="truncate text-sm font-medium text-foreground">
+              {name || "Your account"}
             </span>
-          ) : null}
-        </DropdownMenuLabel>
+            <span className="truncate text-xs font-normal text-muted-foreground">
+              {email || "Signed in"}
+            </span>
+            {role ? (
+              <span className="mt-1 w-fit rounded-full bg-mist px-2 py-0.5 text-[11px] font-semibold text-foreground dark:bg-surface-alt">
+                {roleLabel(role)}
+              </span>
+            ) : null}
+          </DropdownMenuLabel>
+        </DropdownMenuGroup>
         <DropdownMenuSeparator />
 
-        {dashboardHref ? (
-          <DropdownMenuItem render={<Link href={dashboardHref} />}>
-            <LayoutDashboard aria-hidden="true" />
-            {roleLabel(role)} dashboard
+        <DropdownMenuGroup>
+          {dashboardHref ? (
+            <DropdownMenuItem render={<Link href={dashboardHref} />}>
+              <LayoutDashboard aria-hidden="true" />
+              {roleLabel(role)} dashboard
+            </DropdownMenuItem>
+          ) : null}
+          <DropdownMenuItem render={<Link href="/dashboard/profile" />}>
+            <UserRound aria-hidden="true" />
+            Update Profile
           </DropdownMenuItem>
-        ) : null}
-        <DropdownMenuItem render={<Link href="/dashboard/profile" />}>
-          <UserRound aria-hidden="true" />
-          Update Profile
-        </DropdownMenuItem>
+        </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem
-          onClick={handleSignOut}
-          disabled={signingOut}
-          aria-busy={signingOut}
-          variant="destructive"
-        >
-          {signingOut ? <Loader2 aria-hidden="true" className="animate-spin" /> : <LogOut aria-hidden="true" />}
-          {signingOut ? "Signing out…" : "Sign Out"}
-        </DropdownMenuItem>
+        <DropdownMenuGroup>
+          <DropdownMenuItem
+            onClick={handleSignOut}
+            disabled={signingOut}
+            aria-busy={signingOut}
+            variant="destructive"
+          >
+            {signingOut ? <Loader2 aria-hidden="true" className="animate-spin" /> : <LogOut aria-hidden="true" />}
+            {signingOut ? "Signing out…" : "Sign Out"}
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   );
