@@ -15,6 +15,8 @@ const DASHBOARD_LINKS = Object.freeze({
   ]),
   technician: Object.freeze([
     { href: "/dashboard/technician", label: "Overview" },
+    { href: "/dashboard/technician/my-services", label: "My services" },
+    { href: "/dashboard/technician/add-service", label: "Add service" },
     { href: "/dashboard/technician/requests", label: "Requests" },
     PROFILE_LINK,
   ]),

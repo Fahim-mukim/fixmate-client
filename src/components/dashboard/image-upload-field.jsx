@@ -19,6 +19,16 @@ export default function ImageUploadField({
   purpose = "profile",
   currentImageUrl,
   onUploaded,
+  label = "Profile photo",
+  emptyLabel = "No photo",
+  previewAlt = `${purpose} photo preview`,
+  previewClassName = "size-16 rounded-full border border-border object-cover",
+  emptyClassName = "flex size-16 items-center justify-center rounded-full border border-dashed border-border text-xs text-muted-foreground",
+  uploadLabel = "Upload photo",
+  successMessage = "Photo uploaded.",
+  validateUrl = safeProfileImageUrl,
+  inputId,
+  messageId,
 }) {
   const [file, setFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
@@ -69,7 +79,7 @@ export default function ImageUploadField({
     setFile(selected);
     setPreviewUrl(preview);
     setStatus("idle");
-    setMessage("Preview ready. Choose Upload photo.");
+    setMessage(`Preview ready. Choose ${uploadLabel}.`);
   }
 
   async function handleUpload() {
@@ -95,7 +105,7 @@ export default function ImageUploadField({
         setPreviewUrl(null);
         if (inputRef.current) inputRef.current.value = "";
         setStatus("success");
-        setMessage("Photo uploaded.");
+        setMessage(successMessage);
       }
 
       try {
@@ -113,10 +123,10 @@ export default function ImageUploadField({
     }
   }
 
-  const inputId = `${purpose}-photo-input`;
-  const messageId = `${purpose}-photo-message`;
+  const resolvedInputId = inputId ?? `${purpose}-photo-input`;
+  const resolvedMessageId = messageId ?? `${purpose}-photo-message`;
   const uploading = status === "uploading";
-  const displayedImage = previewUrl ?? safeProfileImageUrl(currentImageUrl);
+  const displayedImage = previewUrl ?? validateUrl(currentImageUrl);
 
   return (
     <div className="rounded-xl border border-border bg-mist/50 p-4 dark:bg-surface-alt/40">
@@ -126,28 +136,28 @@ export default function ImageUploadField({
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={displayedImage}
-            alt={`${purpose} photo preview`}
-            className="size-16 rounded-full border border-border object-cover"
+            alt={previewAlt}
+            className={previewClassName}
           />
         ) : (
           <div
             role="img"
-            aria-label="No photo selected"
-            className="flex size-16 items-center justify-center rounded-full border border-dashed border-border text-xs text-muted-foreground"
+            aria-label={`${emptyLabel} selected`}
+            className={emptyClassName}
           >
-            No photo
+            {emptyLabel}
           </div>
         )}
         <div className="min-w-0 flex-1 space-y-2">
-          <Label htmlFor={inputId}>Profile photo</Label>
+          <Label htmlFor={resolvedInputId}>{label}</Label>
           <input
             ref={inputRef}
-            id={inputId}
+            id={resolvedInputId}
             type="file"
             accept={ACCEPTED_TYPES}
             onChange={handleFileChange}
             disabled={uploading}
-            aria-describedby={messageId}
+            aria-describedby={resolvedMessageId}
             className="block w-full text-sm text-muted-foreground file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-2 file:text-sm file:font-medium file:text-primary-foreground"
           />
           <p className="text-xs text-muted-foreground">
@@ -164,7 +174,7 @@ export default function ImageUploadField({
           disabled={!file || uploading}
           aria-busy={uploading}
         >
-          {uploading ? "Uploading…" : "Upload photo"}
+          {uploading ? "Uploading…" : uploadLabel}
         </Button>
         {status === "error" && file ? (
           <Button type="button" variant="outline" onClick={handleUpload} disabled={uploading}>
@@ -174,7 +184,7 @@ export default function ImageUploadField({
       </div>
 
       <p
-        id={messageId}
+        id={resolvedMessageId}
         role={status === "error" ? "alert" : status === "success" ? "status" : undefined}
         aria-live="polite"
         className={
