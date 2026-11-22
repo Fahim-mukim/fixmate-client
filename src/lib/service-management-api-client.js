@@ -1,6 +1,8 @@
 import { createAuthenticatedFetch } from "./authenticated-api.js";
 import {
   SERVICE_MANAGEMENT_PROXY_PATH,
+  buildModerationQuery,
+  buildModerationStatusBody,
   buildOwnedServiceQuery,
   buildServiceWriteBody,
   isValidServiceId,
@@ -102,10 +104,44 @@ export function createServiceManagementApiClient({
     return request("DELETE", `/${id}`);
   }
 
+  function listModerationServices(options) {
+    const query = buildModerationQuery(options);
+    if (!query.ok) {
+      return Promise.resolve(failure(400, "INVALID_MODERATION_QUERY", query.message));
+    }
+    return request("GET", "/moderation", { query: query.query });
+  }
+
+  function getModerationService(id) {
+    if (!isValidServiceId(id)) {
+      return Promise.resolve(
+        failure(400, "INVALID_SERVICE_ID", "Invalid service id."),
+      );
+    }
+    return request("GET", `/moderation/${id}`);
+  }
+
+  function setModerationStatus(id, action) {
+    if (!isValidServiceId(id)) {
+      return Promise.resolve(
+        failure(400, "INVALID_SERVICE_ID", "Invalid service id."),
+      );
+    }
+
+    const body = buildModerationStatusBody(action);
+    if (!body.ok) {
+      return Promise.resolve(failure(400, "INVALID_MODERATION_ACTION", body.message));
+    }
+    return request("PATCH", `/moderation/${id}/approval`, { body: body.body });
+  }
+
   return Object.freeze({
     listOwnedServices,
     createService,
     updateService,
     deleteService,
+    listModerationServices,
+    getModerationService,
+    setModerationStatus,
   });
 }

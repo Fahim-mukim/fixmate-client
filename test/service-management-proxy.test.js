@@ -37,10 +37,23 @@ test("service proxy maps only documented same-origin paths to real server routes
   assert.deepEqual([...SERVICE_PROXY_METHODS], ["GET", "POST", "PATCH", "DELETE"]);
   assert.equal(resolveServiceUpstreamPath("GET", []), "/mine");
   assert.equal(resolveServiceUpstreamPath("GET", ["mine"]), "/mine");
+  assert.equal(resolveServiceUpstreamPath("GET", ["moderation"]), "/moderation");
+  assert.equal(
+    resolveServiceUpstreamPath("GET", ["moderation", SERVICE_ID]),
+    `/moderation/${SERVICE_ID}`,
+  );
   assert.equal(resolveServiceUpstreamPath("POST", []), "");
   assert.equal(resolveServiceUpstreamPath("PATCH", [SERVICE_ID]), `/${SERVICE_ID}`);
+  assert.equal(
+    resolveServiceUpstreamPath("PATCH", ["moderation", SERVICE_ID, "approval"]),
+    `/moderation/${SERVICE_ID}/approval`,
+  );
   assert.equal(resolveServiceUpstreamPath("DELETE", [SERVICE_ID]), `/${SERVICE_ID}`);
   assert.equal(resolveServiceUpstreamPath("GET", [SERVICE_ID]), null);
+  assert.equal(resolveServiceUpstreamPath("GET", ["moderation", "not-an-id"]), null);
+  assert.equal(resolveServiceUpstreamPath("GET", ["moderation", SERVICE_ID, "extra"]), null);
+  assert.equal(resolveServiceUpstreamPath("PATCH", ["moderation", SERVICE_ID]), null);
+  assert.equal(resolveServiceUpstreamPath("PATCH", ["moderation", "not-an-id", "approval"]), null);
   assert.equal(resolveServiceUpstreamPath("PATCH", ["not-an-id"]), null);
   assert.equal(resolveServiceUpstreamPath("DELETE", [SERVICE_ID, "extra"]), null);
   assert.equal(resolveServiceUpstreamPath("PUT", []), null);
@@ -149,7 +162,7 @@ test("service proxy returns explicit auth, route, query, config, and outage erro
   const unauthenticated = await proxy({ method: "GET", segments: ["mine"] });
   const unknownRoute = await proxy({
     method: "GET",
-    segments: ["moderation"],
+    segments: ["not-a-service-route"],
     authorization: "Bearer signed-token",
   });
   const invalidQuery = await proxy({
@@ -209,4 +222,116 @@ test("service proxy preserves delete conflicts and maps transport failures to 50
   assert.equal((await conflict.json()).error.code, "CONFLICT");
   assert.equal(outage.status, 503);
   assert.equal((await outage.json()).error.code, "API_UNAVAILABLE");
+});
+
+test("service proxy maps moderation list and detail with a strict query allowlist", async () => {
+  const calls = [];
+  const proxy = createServiceManagementProxyHandler({
+    env: ENV,
+    fetchImpl: async (url, init) => {
+      calls.push({ url, init });
+      return upstreamResponse({
+        success: true,
+        data: { items: [], page: 2, limit: 12, total: 0, totalPages: 0 },
+      });
+    },
+  });
+
+  const listed = await proxy({
+    method: "GET",
+    segments: ["moderation"],
+    authorization: "Bearer signed-token",
+    searchParams: new URLSearchParams("status=pending&page=2&limit=12"),
+    cookie: "better-auth.session_token=should-not-forward",
+  });
+  assert.equal(listed.status, 200);
+  assert.equal(calls.length, 1);
+  assert.equal(
+    calls[0].url.toString(),
+    "https://api.example.com/api/services/moderation?status=pending&page=2&limit=12",
+  );
+  const headers = new Headers(calls[0].init.headers);
+  assert.equal(headers.get(AUTHORIZATION_HEADER), "Bearer signed-token");
+  assert.equal(headers.get("cookie"), null);
+
+  const unsupported = await proxy({
+    method: "GET",
+    segments: ["moderation"],
+    authorization: "Bearer signed-token",
+    searchParams: new URLSearchParams("status=pending&search=wrench"),
+  });
+  const invalidStatus = await proxy({
+    method: "GET",
+    segments: ["moderation"],
+    authorization: "Bearer signed-token",
+    searchParams: new URLSearchParams("status=all"),
+  });
+  const duplicateStatus = await proxy({
+    method: "GET",
+    segments: ["moderation"],
+    authorization: "Bearer signed-token",
+    searchParams: new URLSearchParams("status=pending&status=approved"),
+  });
+  const detailWithQuery = await proxy({
+    method: "GET",
+    segments: ["moderation", SERVICE_ID],
+    authorization: "Bearer signed-token",
+    searchParams: new URLSearchParams("page=1"),
+  });
+
+  for (const response of [unsupported, invalidStatus, duplicateStatus, detailWithQuery]) {
+    assert.equal(response.status, 400);
+    assert.equal((await response.json()).error.code, "INVALID_QUERY");
+  }
+  assert.equal(calls.length, 1);
+});
+
+test("service proxy forwards only an exact approval body to the moderation route", async () => {
+  const calls = [];
+  const proxy = createServiceManagementProxyHandler({
+    env: ENV,
+    fetchImpl: async (url, init) => {
+      calls.push({ url, init });
+      return upstreamResponse({ success: true, data: { _id: SERVICE_ID } });
+    },
+  });
+
+  const approved = await proxy({
+    method: "PATCH",
+    segments: ["moderation", SERVICE_ID, "approval"],
+    authorization: "Bearer signed-token",
+    body: JSON.stringify({ status: "approved" }),
+    cookie: "better-auth.session_token=should-not-forward",
+  });
+  assert.equal(approved.status, 200);
+  assert.equal(calls.length, 1);
+  assert.equal(
+    calls[0].url.toString(),
+    `https://api.example.com/api/services/moderation/${SERVICE_ID}/approval`,
+  );
+  assert.equal(calls[0].init.method, "PATCH");
+  assert.deepEqual(JSON.parse(calls[0].init.body), { status: "approved" });
+  assert.deepEqual(Object.keys(JSON.parse(calls[0].init.body)), ["status"]);
+  const headers = new Headers(calls[0].init.headers);
+  assert.equal(headers.get(AUTHORIZATION_HEADER), "Bearer signed-token");
+  assert.equal(headers.get("cookie"), null);
+
+  const withReason = await proxy({
+    method: "PATCH",
+    segments: ["moderation", SERVICE_ID, "approval"],
+    authorization: "Bearer signed-token",
+    body: JSON.stringify({ status: "rejected", reason: "invented" }),
+  });
+  const invalidStatus = await proxy({
+    method: "PATCH",
+    segments: ["moderation", SERVICE_ID, "approval"],
+    authorization: "Bearer signed-token",
+    body: JSON.stringify({ status: "pending-review" }),
+  });
+
+  for (const response of [withReason, invalidStatus]) {
+    assert.equal(response.status, 400);
+    assert.equal((await response.json()).error.code, "VALIDATION_FAILED");
+  }
+  assert.equal(calls.length, 1);
 });

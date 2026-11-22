@@ -30,6 +30,33 @@ export const APPROVAL_STATUSES = Object.freeze([
   "rejected",
 ]);
 
+// Mirrors the Server's parseModerationListQuery allowlist. The moderation API
+// does not support search, so the Client must not offer a misleading search box.
+export const MODERATION_FILTERS = Object.freeze([
+  Object.freeze({ value: "pending", label: "Pending" }),
+  Object.freeze({ value: "approved", label: "Approved" }),
+  Object.freeze({ value: "rejected", label: "Rejected" }),
+  Object.freeze({ value: "", label: "All" }),
+]);
+
+export const MODERATION_ACTIONS = Object.freeze({
+  approve: "approved",
+  reject: "rejected",
+});
+
+const ACTION_LABELS = Object.freeze({
+  approve: "Approved",
+  reject: "Rejected",
+});
+
+const MODERATION_ACTIONS_BY_STATUS = Object.freeze({
+  pending: Object.freeze(["approve", "reject"]),
+  rejected: Object.freeze(["approve"]),
+  approved: Object.freeze(["reject"]),
+});
+
+const EMPTY_MODERATION_ACTIONS = Object.freeze([]);
+
 const PRICE_PATTERN = /^\d+(\.\d+)?$/;
 const MAX_QUERY_PAGE = 100000;
 
@@ -152,6 +179,70 @@ export function buildOwnedServiceQuery({ page, limit } = {}) {
   return { ok: true, query, page: nextPage, limit: nextLimit };
 }
 
+export function buildModerationQuery({ status, page, limit } = {}) {
+  const nextStatus = status === undefined || status === null ? "" : status;
+  const nextPage = page === undefined ? DEFAULT_PAGE : page;
+  const nextLimit = limit === undefined ? DEFAULT_LIMIT : limit;
+
+  const statusValid =
+    typeof nextStatus === "string" &&
+    (nextStatus === "" || APPROVAL_STATUSES.includes(nextStatus));
+  const pageValid =
+    Number.isInteger(nextPage) && nextPage >= 1 && nextPage <= MAX_QUERY_PAGE;
+  const limitValid =
+    Number.isInteger(nextLimit) && nextLimit >= 1 && nextLimit <= MAX_LIMIT;
+
+  if (!statusValid || !pageValid || !limitValid) {
+    return { ok: false, message: "Invalid moderation query." };
+  }
+
+  const params = new URLSearchParams();
+  if (nextStatus !== "") params.set("status", nextStatus);
+  params.set("page", String(nextPage));
+  params.set("limit", String(nextLimit));
+
+  return {
+    ok: true,
+    query: params.toString(),
+    status: nextStatus,
+    page: nextPage,
+    limit: nextLimit,
+  };
+}
+
+export function buildModerationStatusBody(action) {
+  if (!Object.prototype.hasOwnProperty.call(MODERATION_ACTIONS, action)) {
+    return { ok: false, message: "Unsupported moderation action." };
+  }
+
+  return Object.freeze({ ok: true, body: Object.freeze({ status: MODERATION_ACTIONS[action] }) });
+}
+
+export function moderationActionsForStatus(status) {
+  if (!Object.prototype.hasOwnProperty.call(MODERATION_ACTIONS_BY_STATUS, status)) {
+    return EMPTY_MODERATION_ACTIONS;
+  }
+  return MODERATION_ACTIONS_BY_STATUS[status];
+}
+
+export function moderationActionLabel(action) {
+  return ACTION_LABELS[action] ?? "";
+}
+
+export function formatServiceCreatedAt(value) {
+  if (typeof value !== "string" && typeof value !== "number" && !(value instanceof Date)) {
+    return "Not provided";
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "Not provided";
+
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+}
+
 export function serviceErrorMessage(result, fallback = "The request could not be completed.") {
   if (!result || result.ok !== false) return fallback;
   if (result.code === "CONFLICT") {
@@ -161,5 +252,13 @@ export function serviceErrorMessage(result, fallback = "The request could not be
   if (result.status === 404) {
     return "That service no longer exists or is not available to you.";
   }
+  return result.message || fallback;
+}
+
+export function moderationErrorMessage(result, fallback = "The request could not be completed.") {
+  if (!result || result.ok !== false) return fallback;
+  if (result.status === 401) return "Your session has expired. Sign in again.";
+  if (result.status === 403) return "Admin access is required for this action.";
+  if (result.status === 404) return "That service is no longer available for review.";
   return result.message || fallback;
 }

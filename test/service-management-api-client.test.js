@@ -173,3 +173,81 @@ test("service API client preserves structured errors and network failures", asyn
     message: "The service request could not be sent.",
   });
 });
+
+test("service API client reads the admin moderation list and detail routes", async () => {
+  const calls = [];
+  const api = clientWithCalls(calls, () =>
+    jsonResponse({
+      success: true,
+      data: { items: [], page: 1, limit: 12, total: 0, totalPages: 0 },
+    }),
+  );
+
+  const listed = await api.listModerationServices({
+    status: "pending",
+    page: 2,
+    limit: 12,
+  });
+  const detail = await api.getModerationService(SERVICE_ID);
+
+  assert.equal(listed.ok, true);
+  assert.equal(detail.ok, true);
+  assert.equal(calls[0].path, "/api/fixmate/services/moderation?status=pending&page=2&limit=12");
+  assert.equal(calls[0].init.method, "GET");
+  assert.equal(calls[0].init.credentials, "omit");
+  assert.equal(calls[0].init.headers.get(AUTHORIZATION_HEADER), "Bearer signed-token");
+  assert.equal(calls[0].init.headers.get("Cookie"), null);
+  assert.equal(calls[1].path, `/api/fixmate/services/moderation/${SERVICE_ID}`);
+  assert.equal(calls[1].init.method, "GET");
+});
+
+test("service API client sends only the mapped approval action as a status body", async () => {
+  const calls = [];
+  const api = clientWithCalls(calls, () =>
+    jsonResponse({ success: true, data: { _id: SERVICE_ID, approvalStatus: "approved" } }),
+  );
+
+  const approved = await api.setModerationStatus(SERVICE_ID, "approve");
+  const rejected = await api.setModerationStatus(SERVICE_ID, "reject");
+
+  assert.equal(approved.ok, true);
+  assert.equal(rejected.ok, true);
+  assert.deepEqual(calls.map((call) => call.path), [
+    `/api/fixmate/services/moderation/${SERVICE_ID}/approval`,
+    `/api/fixmate/services/moderation/${SERVICE_ID}/approval`,
+  ]);
+  for (const [index, call] of calls.entries()) {
+    assert.equal(call.init.method, "PATCH");
+    assert.deepEqual(Object.keys(JSON.parse(call.init.body)), ["status"]);
+    assert.deepEqual(JSON.parse(call.init.body), {
+      status: index === 0 ? "approved" : "rejected",
+    });
+    assert.equal(call.init.credentials, "omit");
+    assert.equal(call.init.headers.get(AUTHORIZATION_HEADER), "Bearer signed-token");
+    assert.equal(call.init.headers.get("Cookie"), null);
+  }
+});
+
+test("service API client rejects invalid moderation input before any request", async () => {
+  let calls = 0;
+  const api = createServiceManagementApiClient({
+    getAccessToken: async () => "token",
+    fetchImpl: async () => {
+      calls += 1;
+      return jsonResponse({ success: true, data: {} });
+    },
+  });
+
+  const results = await Promise.all([
+    api.listModerationServices({ status: "all" }),
+    api.listModerationServices({ page: 0 }),
+    api.getModerationService("bad-id"),
+    api.setModerationStatus("bad-id", "approve"),
+    api.setModerationStatus(SERVICE_ID, "pending"),
+  ]);
+
+  for (const result of results) {
+    assert.equal(result.ok, false);
+  }
+  assert.equal(calls, 0);
+});

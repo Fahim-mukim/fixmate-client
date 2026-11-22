@@ -3,11 +3,19 @@ import assert from "node:assert/strict";
 
 import {
   APPROVAL_STATUSES,
+  MODERATION_ACTIONS,
+  MODERATION_FILTERS,
   SERVICE_MANAGEMENT_PROXY_PATH,
   SERVICE_UPSTREAM_PATH,
   SERVICE_WRITE_FIELDS,
+  buildModerationQuery,
+  buildModerationStatusBody,
   buildOwnedServiceQuery,
   buildServiceWriteBody,
+  formatServiceCreatedAt,
+  moderationActionLabel,
+  moderationActionsForStatus,
+  moderationErrorMessage,
   safeServiceImageUrl,
   serviceErrorMessage,
   serviceFormFromService,
@@ -178,4 +186,70 @@ test("service error copy explains booking conflicts and expired sessions", () =>
   );
   assert.match(serviceErrorMessage({ ok: false, status: 404 }), /no longer exists/i);
   assert.equal(serviceErrorMessage({ ok: false, message: "Server said no." }), "Server said no.");
+});
+
+test("moderation filters mirror the server status values plus all", () => {
+  assert.deepEqual(
+    MODERATION_FILTERS.map((filter) => filter.value),
+    ["pending", "approved", "rejected", ""],
+  );
+  assert.deepEqual(
+    MODERATION_FILTERS.map((filter) => filter.label),
+    ["Pending", "Approved", "Rejected", "All"],
+  );
+  assert.deepEqual(MODERATION_ACTIONS, { approve: "approved", reject: "rejected" });
+});
+
+test("moderation query builder forwards only status, page, and limit", () => {
+  assert.deepEqual(buildModerationQuery(), {
+    ok: true,
+    query: "page=1&limit=12",
+    status: "",
+    page: 1,
+    limit: 12,
+  });
+  assert.deepEqual(buildModerationQuery({ status: "pending", page: 2, limit: 50 }), {
+    ok: true,
+    query: "status=pending&page=2&limit=50",
+    status: "pending",
+    page: 2,
+    limit: 50,
+  });
+  assert.equal(buildModerationQuery({ status: "" }).ok, true);
+  assert.equal(buildModerationQuery({ status: "all" }).ok, false);
+  assert.equal(buildModerationQuery({ status: 1 }).ok, false);
+  assert.equal(buildModerationQuery({ page: 0 }).ok, false);
+  assert.equal(buildModerationQuery({ limit: 51 }).ok, false);
+  assert.equal(buildModerationQuery({ search: "wrench" }).ok, true);
+});
+
+test("moderation decisions map to an exact status-only body and allowed actions", () => {
+  assert.deepEqual(buildModerationStatusBody("approve"), {
+    ok: true,
+    body: { status: "approved" },
+  });
+  assert.deepEqual(buildModerationStatusBody("reject").body, { status: "rejected" });
+  assert.equal(buildModerationStatusBody("pending").ok, false);
+  assert.equal(buildModerationStatusBody("toString").ok, false);
+  assert.deepEqual(Object.keys(buildModerationStatusBody("reject").body), ["status"]);
+
+  assert.deepEqual(moderationActionsForStatus("pending"), ["approve", "reject"]);
+  assert.deepEqual(moderationActionsForStatus("rejected"), ["approve"]);
+  assert.deepEqual(moderationActionsForStatus("approved"), ["reject"]);
+  assert.deepEqual(moderationActionsForStatus("unknown"), []);
+  assert.equal(moderationActionLabel("approve"), "Approved");
+  assert.equal(moderationActionLabel("reject"), "Rejected");
+});
+
+test("created-at formatting and moderation error copy stay explicit", () => {
+  assert.equal(formatServiceCreatedAt(null), "Not provided");
+  assert.equal(formatServiceCreatedAt("not-a-date"), "Not provided");
+  assert.match(formatServiceCreatedAt("2026-11-22T12:00:00.000Z"), /2026/);
+  assert.equal(
+    moderationErrorMessage({ ok: false, status: 403 }),
+    "Admin access is required for this action.",
+  );
+  assert.match(moderationErrorMessage({ ok: false, status: 401 }), /session has expired/i);
+  assert.match(moderationErrorMessage({ ok: false, status: 404 }), /no longer available/i);
+  assert.equal(moderationErrorMessage({ ok: false, message: "Server said no." }), "Server said no.");
 });
