@@ -2,12 +2,17 @@
 
 import { Button } from "@/components/ui/button";
 
-export default function BookingPagination({ page = 1, totalPages = 0, onPageChange }) {
+export default function BookingPagination({
+  page = 1,
+  totalPages = 0,
+  onPageChange,
+  label = "Booking pages",
+}) {
   if (totalPages <= 1) return null;
 
   return (
     <nav
-      aria-label="Booking pages"
+      aria-label={label}
       className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface p-3"
     >
       <p className="text-sm text-muted-foreground">
