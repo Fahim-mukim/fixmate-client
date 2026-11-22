@@ -12,11 +12,20 @@ import { BOOKING_ROLE_LABELS } from "@/lib/dashboard-navigation.js";
 import DashboardShell from "./dashboard-shell.jsx";
 
 const DashboardUserContext = createContext(null);
+const DashboardUserRefreshContext = createContext(null);
 
 export function useDashboardUser() {
   const user = useContext(DashboardUserContext);
   if (!user) throw new Error("useDashboardUser must be used inside DashboardGate.");
   return user;
+}
+
+export function useDashboardUserRefresh() {
+  const refreshUser = useContext(DashboardUserRefreshContext);
+  if (!refreshUser) {
+    throw new Error("useDashboardUserRefresh must be used inside DashboardGate.");
+  }
+  return refreshUser;
 }
 
 function isSessionError(message) {
@@ -33,6 +42,7 @@ function GateFallback({ title, description, children }) {
 
 export default function DashboardGate({
   expectedRole,
+  allowAnyRole = false,
   title,
   description,
   children,
@@ -43,6 +53,12 @@ export default function DashboardGate({
     user: null,
     message: "",
   });
+
+  async function refreshUser() {
+    const user = await getCurrentApplicationUser();
+    setState({ status: "ready", user, message: "" });
+    return user;
+  }
 
   useEffect(() => {
     let active = true;
@@ -123,7 +139,7 @@ export default function DashboardGate({
     );
   }
 
-  if (state.user?.role !== expectedRole) {
+  if (!allowAnyRole && state.user?.role !== expectedRole) {
     return (
       <GateFallback>
         <div
@@ -144,9 +160,15 @@ export default function DashboardGate({
 
   return (
     <DashboardUserContext.Provider value={state.user}>
-      <DashboardShell role={expectedRole} title={title} description={description}>
-        {children}
-      </DashboardShell>
+      <DashboardUserRefreshContext.Provider value={refreshUser}>
+        <DashboardShell
+          role={allowAnyRole ? state.user.role : expectedRole}
+          title={title}
+          description={description}
+        >
+          {children}
+        </DashboardShell>
+      </DashboardUserRefreshContext.Provider>
     </DashboardUserContext.Provider>
   );
 }

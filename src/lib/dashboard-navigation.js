@@ -4,19 +4,24 @@ export const BOOKING_ROLE_LABELS = Object.freeze({
   admin: "Admin dashboard",
 });
 
+const PROFILE_LINK = Object.freeze({ href: "/dashboard/profile", label: "Profile" });
+
 const DASHBOARD_LINKS = Object.freeze({
   customer: Object.freeze([
     { href: "/dashboard/customer", label: "Overview" },
     { href: "/dashboard/customer/bookings", label: "My bookings" },
     { href: "/dashboard/customer/payments", label: "Payments" },
+    PROFILE_LINK,
   ]),
   technician: Object.freeze([
     { href: "/dashboard/technician", label: "Overview" },
     { href: "/dashboard/technician/requests", label: "Requests" },
+    PROFILE_LINK,
   ]),
   admin: Object.freeze([
     { href: "/dashboard/admin", label: "Overview" },
     { href: "/dashboard/admin/bookings", label: "Bookings" },
+    PROFILE_LINK,
   ]),
 });
 
