@@ -19,6 +19,7 @@ import {
   useDashboardUser,
   useDashboardUserRefresh,
 } from "./dashboard-gate.jsx";
+import ImageUploadField from "./image-upload-field.jsx";
 
 const EMPTY_FORM = profileFormFromUser(null);
 
@@ -158,6 +159,22 @@ export default function ProfilePanel() {
     } finally {
       savingRef.current = false;
     }
+  }
+
+  function handleProfilePhotoUploaded(data) {
+    const nextProfile = data.user ?? { ...state.profile, image: data.imageUrl };
+
+    setForm(profileFormFromUser(nextProfile));
+    setState({
+      status: "success",
+      profile: nextProfile,
+      message: "Profile photo updated.",
+    });
+
+    // Keep the dashboard avatar aligned with the canonical user record.
+    refreshUser().catch(() => {
+      // The upload response remains authoritative for this page.
+    });
   }
 
   if (state.status === "loading" && !state.profile) {
@@ -326,10 +343,11 @@ export default function ProfilePanel() {
           </div>
         </div>
 
-        <p className="text-xs leading-5 text-muted-foreground">
-          Profile photo upload is not available yet. Existing images are shown when present;
-          no upload credentials are used in the browser.
-        </p>
+        <ImageUploadField
+          purpose="profile"
+          currentImageUrl={state.profile.image}
+          onUploaded={handleProfilePhotoUploaded}
+        />
 
         {state.status === "error" && state.message ? (
           <p role="alert" className="text-sm text-destructive">

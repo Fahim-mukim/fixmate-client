@@ -7,6 +7,8 @@ import { fileURLToPath } from "node:url";
 import { dashboardLinksForRole } from "../src/lib/dashboard-navigation.js";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
+const DIRECT_IMGBB_UPLOAD_PATH = ["api.imgbb.com", "1", "upload"].join("/");
+
 function source(relativePath) {
   return readFileSync(join(root, relativePath), "utf8");
 }
@@ -80,19 +82,32 @@ test("profile panel shows loading, saving, success, error, and duplicate-submit 
 test("profile image boundary keeps upload credentials out of the browser", () => {
   const files = [
     "src/components/dashboard/profile-panel.jsx",
+    "src/components/dashboard/image-upload-field.jsx",
     "src/lib/profile-contract.js",
     "src/lib/profile-api-client.js",
     "src/lib/profile-proxy.js",
+    "src/lib/image-upload-contract.js",
+    "src/lib/upload-api-client.js",
+    "src/lib/upload-proxy.js",
+    "src/app/api/fixmate/uploads/route.js",
   ];
 
   for (const file of files) {
     const contents = source(file);
     assert.ok(!contents.includes("NEXT_PUBLIC_"), `${file} must not expose private config`);
     assert.ok(!/imgbb\s*key/i.test(contents), `${file} must not contain an upload key`);
+    assert.ok(
+      !contents.includes(DIRECT_IMGBB_UPLOAD_PATH),
+      `${file} must not call ImgBB directly`,
+    );
   }
 
   const panel = source("src/components/dashboard/profile-panel.jsx");
-  assert.match(panel, /Profile photo upload is not available yet/);
+  assert.match(panel, /ImageUploadField/);
+  assert.match(panel, /purpose="profile"/);
+  assert.match(panel, /currentImageUrl=\{state\.profile\.image\}/);
+  assert.match(panel, /Profile photo updated\./);
+  assert.ok(!panel.includes("Profile photo upload is not available yet"));
 });
 
 test("profile BFF route forwards only GET and PATCH through the safe proxy", () => {
