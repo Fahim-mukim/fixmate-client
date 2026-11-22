@@ -7,6 +7,7 @@ import {
   USER_ROLE_FILTERS,
   USER_ROLES,
   adminUserErrorMessage,
+  adminUserRoleErrorMessage,
   buildAdminUserQuery,
   formatAdminUserCreatedAt,
   isValidAdminUserId,
@@ -94,6 +95,32 @@ test("admin user ids, dates, images, and errors are handled safely", () => {
   );
   assert.equal(
     adminUserErrorMessage({ ok: false, message: "Server detail" }, "fallback"),
+    "Server detail",
+  );
+});
+
+test("admin role error messages distinguish self, authorization, and expiry failures", () => {
+  assert.equal(
+    adminUserRoleErrorMessage(
+      { ok: false, status: 403, code: "SELF_ROLE_CHANGE_FORBIDDEN" },
+      "fallback",
+    ),
+    "You cannot change your own role.",
+  );
+  assert.equal(
+    adminUserRoleErrorMessage({ ok: false, status: 403 }, "fallback"),
+    "Admin access is required to change user roles.",
+  );
+  assert.equal(
+    adminUserRoleErrorMessage({ ok: false, status: 401 }, "fallback"),
+    "Your session has expired. Sign in again.",
+  );
+  assert.equal(
+    adminUserRoleErrorMessage({ ok: false, status: 404 }, "fallback"),
+    "That user is no longer available.",
+  );
+  assert.equal(
+    adminUserRoleErrorMessage({ ok: false, message: "Server detail" }, "fallback"),
     "Server detail",
   );
 });

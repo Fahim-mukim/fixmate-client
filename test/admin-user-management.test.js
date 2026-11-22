@@ -74,19 +74,33 @@ test("admin panel provides filters, search, responsive states, and pagination", 
   assert.match(panel, /adminUserErrorMessage\(error/);
 });
 
-test("admin panel requires server detail inspection and exposes no mutations", () => {
+test("admin panel inspects details and provides server-confirmed role changes", () => {
   const panel = source("src/components/dashboard/admin-users-panel.jsx");
 
   assert.match(panel, /openDetail\(user\)/);
   assert.match(panel, /adminUserApi\.getAdminUser\(user\.id\)/);
   assert.match(panel, /aria-label="Loading user details"/);
   assert.match(panel, /detailIsCurrent/);
-  assert.match(panel, /This view is read-only/);
-  assert.ok(!/method:\s*["'](?:POST|PUT|PATCH|DELETE)["']/.test(panel));
-  assert.ok(!panel.includes("setUserRole"));
+  assert.match(panel, /adminUserApi\.updateAdminUserRole\(id, role\)/);
+  assert.match(panel, /role="status"/);
+  assert.match(panel, /setReloadToken\(\(value\) => value \+ 1\)/);
   assert.ok(!panel.includes("deleteUser"));
   assert.ok(!panel.includes("suspendUser"));
   assert.ok(!panel.includes("setUserStatus"));
+});
+
+test("admin panel blocks self-role changes and duplicate role submissions", () => {
+  const panel = source("src/components/dashboard/admin-users-panel.jsx");
+
+  assert.match(panel, /useDashboardUser\(\)/);
+  assert.match(panel, /currentUserId/);
+  assert.match(panel, /isSelfUser\(user\)/);
+  assert.match(panel, /Self-role changes are blocked/);
+  assert.match(panel, /updatingRoleRef\.current/);
+  assert.match(panel, /setUpdatingUserId\(id\)/);
+  assert.match(panel, /disabled=\{disabled \|\| isSelf\}/);
+  assert.match(panel, /aria-busy=\{updating\}/);
+  assert.match(panel, /controlsDisabled/);
 });
 
 test("admin user BFF is Bearer-only and never forwards cookies", () => {
@@ -98,6 +112,8 @@ test("admin user BFF is Bearer-only and never forwards cookies", () => {
   assert.ok(!proxy.includes("cookie"));
   assert.match(route, /connection\(\)/);
   assert.match(route, /request\.headers\.get\(AUTHORIZATION_HEADER\)/);
+  assert.match(route, /await request\.text\(\)/);
+  assert.match(route, /export async function PATCH/);
 });
 
 test("admin user source adds no browser-visible secret or direct upload path", () => {

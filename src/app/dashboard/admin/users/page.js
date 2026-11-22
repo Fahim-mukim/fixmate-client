@@ -11,7 +11,7 @@ export default function AdminUsersPage() {
     <DashboardGate
       expectedRole="admin"
       title="All users"
-      description="Inspect registered accounts by role, name, or email. This page is read-only; the Server enforces Admin authorization."
+      description="Inspect registered accounts by role, name, or email. Admins can change other users' roles; the Server enforces Admin authorization and blocks self-role changes."
     >
       <AdminUsersPanel />
     </DashboardGate>

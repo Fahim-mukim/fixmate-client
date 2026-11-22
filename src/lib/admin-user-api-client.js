@@ -1,6 +1,7 @@
 import { createAuthenticatedFetch } from "./authenticated-api.js";
 import {
   ADMIN_USER_PROXY_PATH,
+  USER_ROLES,
   buildAdminUserQuery,
   isValidAdminUserId,
 } from "./admin-user-contract.js";
@@ -32,11 +33,13 @@ export function createAdminUserApiClient({
     authenticatedFetch ??
     createAuthenticatedFetch({ getAccessToken, fetchImpl });
 
-  async function request(segment = "", query = "") {
+  async function request(segment = "", query = "", init = {}) {
     const path = `${ADMIN_USER_PROXY_PATH}${segment}${query ? `?${query}` : ""}`;
 
     try {
-      return await readResult(await requestFetch(path, { method: "GET" }));
+      return await readResult(
+        await requestFetch(path, { method: "GET", ...init }),
+      );
     } catch {
       return failure(
         0,
@@ -61,5 +64,20 @@ export function createAdminUserApiClient({
     return request(`/${id}`);
   }
 
-  return Object.freeze({ listAdminUsers, getAdminUser });
+  function updateAdminUserRole(id, role) {
+    if (!isValidAdminUserId(id)) {
+      return Promise.resolve(failure(400, "INVALID_ADMIN_USER_ID", "Invalid user id."));
+    }
+    if (!USER_ROLES.includes(role)) {
+      return Promise.resolve(failure(400, "INVALID_ADMIN_USER_ROLE", "Invalid role."));
+    }
+
+    return request(`/${id}/role`, "", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role }),
+    });
+  }
+
+  return Object.freeze({ listAdminUsers, getAdminUser, updateAdminUserRole });
 }

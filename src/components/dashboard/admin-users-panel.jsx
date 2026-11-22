@@ -11,12 +11,15 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { adminUserApi } from "@/lib/admin-user-api.js";
 import {
+  USER_ROLES,
   USER_ROLE_FILTERS,
   adminUserErrorMessage,
+  adminUserRoleErrorMessage,
   formatAdminUserCreatedAt,
   safeProfileImageUrl,
 } from "@/lib/admin-user-contract.js";
 import BookingPagination from "./pagination.jsx";
+import { useDashboardUser } from "./dashboard-gate.jsx";
 
 const USER_LIMIT = 12;
 const ROLE_VARIANTS = Object.freeze({
@@ -24,12 +27,69 @@ const ROLE_VARIANTS = Object.freeze({
   technician: "secondary",
   customer: "outline",
 });
+const ROLE_LABELS = Object.freeze(
+  Object.fromEntries(
+    USER_ROLE_FILTERS.filter((filter) => filter.value).map((filter) => [
+      filter.value,
+      filter.label,
+    ]),
+  ),
+);
 
 function RoleBadge({ role }) {
   return (
     <Badge variant={ROLE_VARIANTS[role] ?? "outline"}>
       {role || "unknown"}
     </Badge>
+  );
+}
+
+function RoleEditor({
+  user,
+  draft,
+  isSelf,
+  disabled,
+  updating,
+  onDraftChange,
+  onSave,
+}) {
+  const role = USER_ROLES.includes(draft) ? draft : user.role;
+
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="sr-only" htmlFor={`admin-user-role-${user.id}`}>
+          Change role for {user.name || user.email || "user"}
+        </label>
+        <select
+          id={`admin-user-role-${user.id}`}
+          value={role}
+          disabled={disabled || isSelf}
+          onChange={(event) => onDraftChange(user.id, event.target.value)}
+          className="h-9 rounded-lg border border-input bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-input/30"
+        >
+          {USER_ROLES.map((option) => (
+            <option key={option} value={option}>
+              {ROLE_LABELS[option]}
+            </option>
+          ))}
+        </select>
+        <Button
+          type="button"
+          size="sm"
+          disabled={disabled || isSelf || updating || role === user.role}
+          aria-busy={updating}
+          onClick={() => onSave(user)}
+        >
+          {updating ? "Saving…" : "Save role"}
+        </Button>
+      </div>
+      {isSelf ? (
+        <p className="text-xs text-muted-foreground">
+          This is your account. Self-role changes are blocked.
+        </p>
+      ) : null}
+    </div>
   );
 }
 
@@ -88,6 +148,9 @@ function UsersSkeleton() {
 }
 
 export default function AdminUsersPanel() {
+  const currentUser = useDashboardUser();
+  const currentUserId = currentUser?.id ?? null;
+
   const [page, setPage] = useState(1);
   const [roleFilter, setRoleFilter] = useState("");
   const [searchInput, setSearchInput] = useState("");
@@ -100,7 +163,21 @@ export default function AdminUsersPanel() {
   const [detail, setDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState(null);
+  const [roleDrafts, setRoleDrafts] = useState({});
+  const [updatingUserId, setUpdatingUserId] = useState(null);
+  const [mutation, setMutation] = useState(null);
   const detailRequestRef = useRef(0);
+  const updatingRoleRef = useRef(false);
+
+  const controlsDisabled = loading || Boolean(updatingUserId);
+
+  function isSelfUser(user) {
+    return Boolean(
+      currentUserId &&
+        user?.id &&
+        String(currentUserId).toLowerCase() === String(user.id).toLowerCase(),
+    );
+  }
 
   const load = useCallback(async (targetPage, targetRole, targetSearch) => {
     setLoading(true);
@@ -115,6 +192,13 @@ export default function AdminUsersPanel() {
 
     if (result.ok && result.data) {
       setData(result.data);
+      setRoleDrafts((current) => {
+        const next = { ...current };
+        for (const item of result.data.items ?? []) {
+          if (next[item.id] === undefined) next[item.id] = item.role;
+        }
+        return next;
+      });
     } else {
       setData(null);
       setError(result);
@@ -149,6 +233,11 @@ export default function AdminUsersPanel() {
 
     if (result.ok && result.data) {
       setDetail(result.data);
+      setRoleDrafts((current) => (
+        current[result.data.id] === undefined
+          ? { ...current, [result.data.id]: result.data.role }
+          : current
+      ));
     } else {
       setDetailError(result);
     }
@@ -158,6 +247,7 @@ export default function AdminUsersPanel() {
   function handleRoleChange(value) {
     setRoleFilter(value);
     setPage(1);
+    setMutation(null);
     closeDetail();
   }
 
@@ -165,6 +255,7 @@ export default function AdminUsersPanel() {
     event.preventDefault();
     setSearch(searchInput);
     setPage(1);
+    setMutation(null);
     closeDetail();
   }
 
@@ -173,12 +264,74 @@ export default function AdminUsersPanel() {
     setSearch("");
     setRoleFilter("");
     setPage(1);
+    setMutation(null);
     closeDetail();
   }
 
   function handleRefresh() {
+    setMutation(null);
     closeDetail();
     setReloadToken((value) => value + 1);
+  }
+
+  function handleRoleDraftChange(id, role) {
+    setRoleDrafts((current) => ({ ...current, [id]: role }));
+    setMutation(null);
+  }
+
+  async function handleRoleUpdate(user) {
+    const id = user?.id;
+    const role = roleDrafts[id] ?? user?.role;
+
+    if (!id || !USER_ROLES.includes(role) || role === user.role) return;
+    if (isSelfUser(user)) return;
+    if (updatingRoleRef.current) return;
+
+    updatingRoleRef.current = true;
+    setUpdatingUserId(id);
+    setMutation({
+      status: "loading",
+      userId: id,
+      message: `Updating ${user.name || user.email || "user"}…`,
+    });
+
+    try {
+      const result = await adminUserApi.updateAdminUserRole(id, role);
+      if (!result.ok || !result.data) {
+        setMutation({
+          status: "error",
+          userId: id,
+          message: adminUserRoleErrorMessage(result),
+        });
+        return;
+      }
+
+      const updated = result.data;
+      setData((current) => (
+        current
+          ? {
+              ...current,
+              items: (current.items ?? []).map((item) => (
+                item.id === id ? { ...item, ...updated } : item
+              )),
+            }
+          : current
+      ));
+      setRoleDrafts((current) => ({ ...current, [id]: updated.role }));
+      setMutation({
+        status: "success",
+        userId: id,
+        message: `${updated.name || "User"} is now ${
+          ROLE_LABELS[updated.role] || updated.role
+        }.`,
+      });
+
+      if (selectedUser?.id === id) void openDetail(updated);
+      setReloadToken((value) => value + 1);
+    } finally {
+      updatingRoleRef.current = false;
+      setUpdatingUserId(null);
+    }
   }
 
   function retryDetail() {
@@ -205,8 +358,9 @@ export default function AdminUsersPanel() {
           <select
             id="admin-user-role-filter"
             value={roleFilter}
+            disabled={controlsDisabled}
             onChange={(event) => handleRoleChange(event.target.value)}
-            className="h-9 w-full rounded-lg border border-input bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
+            className="h-9 w-full rounded-lg border border-input bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-input/30"
           >
             {USER_ROLE_FILTERS.map((filter) => (
               <option key={filter.value || "all"} value={filter.value}>
@@ -226,14 +380,15 @@ export default function AdminUsersPanel() {
               id="admin-user-search"
               type="search"
               value={searchInput}
+              disabled={controlsDisabled}
               onChange={(event) => setSearchInput(event.target.value)}
               placeholder="Name or email"
               maxLength={100}
-              className="h-9 w-full rounded-lg border border-input bg-background pr-2.5 pl-8 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
+              className="h-9 w-full rounded-lg border border-input bg-background pr-2.5 pl-8 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-input/30"
             />
           </div>
         </div>
-        <Button type="submit" size="sm" disabled={loading}>
+        <Button type="submit" size="sm" disabled={controlsDisabled}>
           Search
         </Button>
         <Button
@@ -241,7 +396,7 @@ export default function AdminUsersPanel() {
           variant="outline"
           size="sm"
           onClick={handleClearFilters}
-          disabled={loading}
+          disabled={controlsDisabled}
         >
           Clear
         </Button>
@@ -250,13 +405,26 @@ export default function AdminUsersPanel() {
           variant="outline"
           size="sm"
           onClick={handleRefresh}
-          disabled={loading}
-          aria-busy={loading}
+          disabled={controlsDisabled}
+          aria-busy={controlsDisabled}
         >
           <RefreshCw aria-hidden="true" className="size-4" />
           {loading ? "Refreshing…" : "Refresh"}
         </Button>
       </form>
+
+      {mutation && mutation.status !== "loading" ? (
+        <div
+          role={mutation.status === "error" ? "alert" : "status"}
+          className={`rounded-lg border px-4 py-3 text-sm ${
+            mutation.status === "error"
+              ? "border-danger/35 bg-danger/5 text-danger"
+              : "border-border bg-mist text-foreground dark:bg-surface-alt"
+          }`}
+        >
+          {mutation.message}
+        </div>
+      ) : null}
 
       <div>
         <h2 id="admin-users-heading" className="sr-only">
@@ -298,7 +466,7 @@ export default function AdminUsersPanel() {
         {!loading && !error && data?.items?.length > 0 ? (
           <div className="space-y-4">
             <div className="hidden overflow-x-auto rounded-xl border border-border bg-surface md:block">
-              <table className="w-full min-w-[820px] text-left text-sm">
+              <table className="w-full min-w-[980px] text-left text-sm">
                 <thead className="bg-mist text-xs tracking-wide text-muted-foreground uppercase dark:bg-surface-alt">
                   <tr>
                     <th scope="col" className="px-4 py-3">Image</th>
@@ -308,6 +476,7 @@ export default function AdminUsersPanel() {
                     <th scope="col" className="px-4 py-3">Phone</th>
                     <th scope="col" className="px-4 py-3">Area</th>
                     <th scope="col" className="px-4 py-3">Created</th>
+                    <th scope="col" className="px-4 py-3">Manage role</th>
                     <th scope="col" className="px-4 py-3">Details</th>
                   </tr>
                 </thead>
@@ -328,6 +497,17 @@ export default function AdminUsersPanel() {
                       <td className="px-4 py-3">{user.area || "Not provided"}</td>
                       <td className="px-4 py-3 text-xs text-muted-foreground">
                         {formatAdminUserCreatedAt(user.createdAt)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <RoleEditor
+                          user={user}
+                          draft={roleDrafts[user.id]}
+                          isSelf={isSelfUser(user)}
+                          disabled={controlsDisabled}
+                          updating={updatingUserId === user.id}
+                          onDraftChange={handleRoleDraftChange}
+                          onSave={(target) => void handleRoleUpdate(target)}
+                        />
                       </td>
                       <td className="px-4 py-3">
                         <Button
@@ -372,6 +552,15 @@ export default function AdminUsersPanel() {
                       {formatAdminUserCreatedAt(user.createdAt)}
                     </DetailField>
                   </dl>
+                  <RoleEditor
+                    user={user}
+                    draft={roleDrafts[user.id]}
+                    isSelf={isSelfUser(user)}
+                    disabled={controlsDisabled}
+                    updating={updatingUserId === user.id}
+                    onDraftChange={handleRoleDraftChange}
+                    onSave={(target) => void handleRoleUpdate(target)}
+                  />
                   <Button
                     type="button"
                     variant="outline"
@@ -466,8 +655,8 @@ export default function AdminUsersPanel() {
                   role="status"
                   className="rounded-lg border border-border bg-mist p-3 text-sm text-foreground dark:bg-surface-alt"
                 >
-                  This view is read-only. No role, credential, or account changes are
-                  available here.
+                  Role changes are saved by the Server and confirmed here before the
+                  updated role is shown.
                 </p>
               </>
             ) : null}

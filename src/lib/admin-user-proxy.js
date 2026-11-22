@@ -7,25 +7,51 @@ import {
 } from "./admin-user-contract.js";
 
 export const ADMIN_USER_PROXY_PATH = "/api/fixmate/admin-users";
-export const ADMIN_USER_PROXY_METHODS = Object.freeze(["GET"]);
+export const ADMIN_USER_PROXY_METHODS = Object.freeze(["GET", "PATCH"]);
 
 const REQUEST_TIMEOUT_MS = 7000;
 const MAX_RESPONSE_LENGTH = 1024 * 1024;
+const MAX_REQUEST_LENGTH = 16 * 1024;
 const MAX_SEARCH_LENGTH = 100;
 const MAX_QUERY_PAGE = 100000;
 const MAX_QUERY_LIMIT = 50;
 const ALLOWED_QUERY_KEYS = new Set(["role", "search", "page", "limit"]);
+const SAFE_USER_FIELDS = Object.freeze([
+  "id",
+  "name",
+  "email",
+  "image",
+  "role",
+  "phone",
+  "area",
+  "bio",
+  "createdAt",
+]);
 
 function errorResponse(status, code, message) {
   return Response.json({ success: false, error: { code, message } }, { status });
 }
 
 export function resolveAdminUserUpstreamPath(method, segments = []) {
-  if (method !== "GET") return null;
-
   const parts = Array.isArray(segments) ? segments : [];
-  if (parts.length === 0) return "";
-  if (parts.length === 1 && isValidAdminUserId(parts[0])) return `/${parts[0]}`;
+
+  if (method === "GET") {
+    if (parts.length === 0) return "";
+    if (parts.length === 1 && isValidAdminUserId(parts[0])) return `/${parts[0]}`;
+    return null;
+  }
+
+  if (method === "PATCH") {
+    if (
+      parts.length === 2 &&
+      parts[1] === "role" &&
+      isValidAdminUserId(parts[0])
+    ) {
+      return `/${parts[0]}/role`;
+    }
+    return null;
+  }
+
   return null;
 }
 
@@ -80,6 +106,67 @@ function resolveQuery(searchParams) {
   return query.toString();
 }
 
+function hasQueryParams(searchParams) {
+  const params =
+    searchParams instanceof URLSearchParams
+      ? searchParams
+      : new URLSearchParams(searchParams ?? {});
+  return [...params.keys()].length > 0;
+}
+
+function parseRoleUpdateBody(rawBody) {
+  if (
+    typeof rawBody !== "string" ||
+    rawBody.length === 0 ||
+    rawBody.length > MAX_REQUEST_LENGTH
+  ) {
+    return null;
+  }
+
+  let payload;
+  try {
+    payload = JSON.parse(rawBody);
+  } catch {
+    return null;
+  }
+
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return null;
+  }
+  const keys = Object.keys(payload);
+  if (keys.length !== 1 || keys[0] !== "role") return null;
+  if (typeof payload.role !== "string" || !USER_ROLES.includes(payload.role)) {
+    return null;
+  }
+
+  return JSON.stringify({ role: payload.role });
+}
+
+function safeRoleUpdateResponse(responseBody) {
+  let payload;
+  try {
+    payload = JSON.parse(responseBody);
+  } catch {
+    return responseBody;
+  }
+
+  if (!payload || payload.success !== true || !payload.data) {
+    return responseBody;
+  }
+  if (typeof payload.data !== "object" || Array.isArray(payload.data)) {
+    return responseBody;
+  }
+
+  const safeData = {};
+  for (const field of SAFE_USER_FIELDS) {
+    if (Object.prototype.hasOwnProperty.call(payload.data, field)) {
+      safeData[field] = payload.data[field];
+    }
+  }
+
+  return JSON.stringify({ ...payload, data: safeData });
+}
+
 export function createAdminUserProxyHandler({
   env,
   fetchImpl,
@@ -96,6 +183,7 @@ export function createAdminUserProxyHandler({
     segments,
     authorization,
     searchParams,
+    body,
   } = {}) {
     if (!ADMIN_USER_PROXY_METHODS.includes(method)) {
       return errorResponse(405, "METHOD_NOT_ALLOWED", "Method not allowed.");
@@ -115,9 +203,22 @@ export function createAdminUserProxyHandler({
       );
     }
 
-    const query = resolveQuery(searchParams);
-    if (query === null) {
-      return errorResponse(400, "INVALID_QUERY", "Admin user query is not supported.");
+    let query = "";
+    let upstreamBody;
+
+    if (method === "PATCH") {
+      if (hasQueryParams(searchParams)) {
+        return errorResponse(400, "INVALID_QUERY", "Admin user query is not supported.");
+      }
+      upstreamBody = parseRoleUpdateBody(body);
+      if (upstreamBody === null) {
+        return errorResponse(400, "INVALID_BODY", "Admin user role update is not supported.");
+      }
+    } else {
+      query = resolveQuery(searchParams);
+      if (query === null) {
+        return errorResponse(400, "INVALID_QUERY", "Admin user query is not supported.");
+      }
     }
 
     const origin = resolveServerApiOrigin(environment);
@@ -137,11 +238,13 @@ export function createAdminUserProxyHandler({
 
     try {
       const response = await upstreamFetch(url, {
-        method: "GET",
+        method,
         headers: {
           Accept: "application/json",
           [AUTHORIZATION_HEADER]: `Bearer ${token}`,
+          ...(method === "PATCH" ? { "Content-Type": "application/json" } : {}),
         },
+        ...(method === "PATCH" ? { body: upstreamBody } : {}),
         cache: "no-store",
         signal: controller.signal,
       });
@@ -155,7 +258,12 @@ export function createAdminUserProxyHandler({
         );
       }
 
-      return new Response(responseBody || null, {
+      const responseContent =
+        method === "PATCH"
+          ? safeRoleUpdateResponse(responseBody)
+          : responseBody;
+
+      return new Response(responseContent || null, {
         status: response.status,
         headers: {
           "Content-Type":

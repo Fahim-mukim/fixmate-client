@@ -118,3 +118,73 @@ test("admin user API client returns structured upstream and transport errors", a
   assert.equal(networkResult.code, "CLIENT_REQUEST_FAILED");
   assert.equal(forbiddenCalls.length, 1);
 });
+
+test("admin user API client patches a validated role through the same-origin BFF", async () => {
+  const calls = [];
+  const client = clientFor(
+    jsonResponse({
+      success: true,
+      data: { id: USER_ID, name: "Jane", role: "technician" },
+    }),
+    calls,
+  );
+
+  const result = await client.updateAdminUserRole(USER_ID, "technician");
+
+  assert.equal(result.ok, true);
+  assert.equal(result.data.role, "technician");
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].path, `/api/fixmate/admin-users/${USER_ID}/role`);
+  assert.equal(calls[0].init.method, "PATCH");
+  assert.equal(calls[0].init.body, JSON.stringify({ role: "technician" }));
+  assert.equal(calls[0].init.headers["Content-Type"], "application/json");
+});
+
+test("admin user API client rejects invalid role updates before any request", async () => {
+  const calls = [];
+  const client = clientFor(jsonResponse({ success: true, data: {} }), calls);
+
+  const badId = await client.updateAdminUserRole("not-an-id", "admin");
+  const badRole = await client.updateAdminUserRole(USER_ID, "owner");
+
+  assert.deepEqual(badId, {
+    ok: false,
+    status: 400,
+    code: "INVALID_ADMIN_USER_ID",
+    message: "Invalid user id.",
+  });
+  assert.deepEqual(badRole, {
+    ok: false,
+    status: 400,
+    code: "INVALID_ADMIN_USER_ROLE",
+    message: "Invalid role.",
+  });
+  assert.equal(calls.length, 0);
+});
+
+test("admin user API client preserves role update errors", async () => {
+  const calls = [];
+  const client = clientFor(
+    jsonResponse(
+      {
+        success: false,
+        error: {
+          code: "SELF_ROLE_CHANGE_FORBIDDEN",
+          message: "Admins cannot change their own role.",
+        },
+      },
+      403,
+    ),
+    calls,
+  );
+
+  const result = await client.updateAdminUserRole(USER_ID, "customer");
+
+  assert.deepEqual(result, {
+    ok: false,
+    status: 403,
+    code: "SELF_ROLE_CHANGE_FORBIDDEN",
+    message: "Admins cannot change their own role.",
+  });
+  assert.equal(calls.length, 1);
+});

@@ -88,3 +88,18 @@ export function adminUserErrorMessage(result, fallback = "The request could not 
   if (result.status === 404) return "That user is no longer available.";
   return result.message || fallback;
 }
+
+export function adminUserRoleErrorMessage(
+  result,
+  fallback = "The role could not be updated.",
+) {
+  if (!result || result.ok !== false) return fallback;
+  if (result.status === 401) return "Your session has expired. Sign in again.";
+  if (result.status === 403) {
+    return result.code === "SELF_ROLE_CHANGE_FORBIDDEN"
+      ? "You cannot change your own role."
+      : "Admin access is required to change user roles.";
+  }
+  if (result.status === 404) return "That user is no longer available.";
+  return result.message || fallback;
+}
