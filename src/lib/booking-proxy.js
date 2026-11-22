@@ -1,10 +1,13 @@
 import { AUTHORIZATION_HEADER, extractBearerToken } from "./bearer-auth.js";
-import { isValidBookingId } from "./booking-contract.js";
+import { BOOKING_STATUSES, isValidBookingId } from "./booking-contract.js";
 
 export const BOOKINGS_PROXY_PATH = "/api/fixmate/bookings";
 export const BOOKING_UPSTREAM_PATH = "/api/bookings";
 export const PROXY_QUERY_KEYS = Object.freeze(["status", "page", "limit"]);
 const REQUEST_TIMEOUT_MS = 7000;
+const MAX_RESPONSE_LENGTH = 1024 * 1024;
+const MAX_QUERY_PAGE = 100000;
+const MAX_QUERY_LIMIT = 50;
 
 export function createBookingProxyRequest({
   basePath = BOOKINGS_PROXY_PATH,
@@ -28,6 +31,59 @@ export function createBookingProxyRequest({
 
   const serialized = search.toString();
   return serialized ? `${path}?${serialized}` : path;
+}
+
+function parseBoundedInteger(value, maximum) {
+  if (value === null || !/^\d+$/.test(value)) return null;
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed < 1 || parsed > maximum) return null;
+  return value;
+}
+
+export function resolveBookingQuery(searchParams) {
+  const params =
+    searchParams instanceof URLSearchParams
+      ? searchParams
+      : new URLSearchParams(searchParams ?? {});
+
+  const seen = new Set();
+  for (const key of params.keys()) {
+    if (!PROXY_QUERY_KEYS.includes(key) || seen.has(key)) return null;
+    seen.add(key);
+  }
+
+  const status = params.get("status");
+  if (status !== null && status !== "" && !BOOKING_STATUSES.includes(status)) {
+    return null;
+  }
+
+  const page = parseBoundedInteger(params.get("page"), MAX_QUERY_PAGE);
+  const limit = parseBoundedInteger(params.get("limit"), MAX_QUERY_LIMIT);
+  if (
+    (params.get("page") !== null && page === null) ||
+    (params.get("limit") !== null && limit === null)
+  ) {
+    return null;
+  }
+
+  const query = new URLSearchParams();
+  if (status) query.set("status", status);
+  if (page !== null) query.set("page", page);
+  if (limit !== null) query.set("limit", limit);
+  return query;
+}
+
+function resolveMutationQuery(searchParams) {
+  const params =
+    searchParams instanceof URLSearchParams
+      ? searchParams
+      : new URLSearchParams(searchParams ?? {});
+  const query = new URLSearchParams();
+  for (const key of PROXY_QUERY_KEYS) {
+    const value = params.get(key);
+    if (value) query.set(key, value);
+  }
+  return query;
 }
 
 export function resolveServerApiOrigin(env) {
@@ -114,6 +170,13 @@ export function createBookingProxyHandler({
       return errorResponse(404, "BOOKING_ROUTE_NOT_FOUND", "Booking route not found.");
     }
 
+    const query = method === "GET"
+      ? resolveBookingQuery(searchParams)
+      : resolveMutationQuery(searchParams);
+    if (query === null) {
+      return errorResponse(400, "INVALID_QUERY", "Booking query is not supported.");
+    }
+
     const origin = resolveServerApiOrigin(environment);
     if (!origin) {
       return errorResponse(
@@ -124,12 +187,7 @@ export function createBookingProxyHandler({
     }
 
     const target = new URL(`${BOOKING_UPSTREAM_PATH}${suffix}`, origin);
-    for (const key of PROXY_QUERY_KEYS) {
-      const value = searchParams?.get?.(key);
-      if (value !== null && value !== undefined && value !== "") {
-        target.searchParams.set(key, value);
-      }
-    }
+    target.search = query.toString();
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
@@ -148,6 +206,14 @@ export function createBookingProxyHandler({
       });
 
       const responseBody = await response.text();
+      if (responseBody.length > MAX_RESPONSE_LENGTH) {
+        return errorResponse(
+          502,
+          "RESPONSE_TOO_LARGE",
+          "The server response is too large.",
+        );
+      }
+
       return new Response(responseBody || null, {
         status: response.status,
         headers: {

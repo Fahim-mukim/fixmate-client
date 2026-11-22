@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import ServiceImage from "@/components/services/service-image.jsx";
 import { bookingApi } from "@/lib/booking-api.js";
 import {
   DEFAULT_BOOKING_LIMIT,
@@ -117,14 +118,21 @@ export default function AdminBookingsPanel({ compact = false }) {
               >
                 <div className="p-4 sm:p-5">
                   <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <h3 className="text-lg font-semibold">
-                        {booking.serviceTitle || "Service not provided"}
-                      </h3>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {booking.customerName || "Customer not provided"} →{" "}
-                        {booking.technicianName || "Technician not provided"}
-                      </p>
+                    <div className="flex min-w-0 items-start gap-3">
+                      <ServiceImage
+                        src={booking.serviceImage}
+                        alt={booking.serviceTitle || "Service"}
+                        className="size-14 shrink-0 rounded-lg"
+                      />
+                      <div className="min-w-0">
+                        <h3 className="text-lg font-semibold">
+                          {booking.serviceTitle || "Service not provided"}
+                        </h3>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {booking.customerName || "Customer not provided"} →{" "}
+                          {booking.technicianName || "Technician not provided"}
+                        </p>
+                      </div>
                     </div>
                     <BookingStatusBadge status={booking.status} />
                   </div>
