@@ -9,9 +9,21 @@ import { Button } from "@/components/ui/button";
 import ButtonLink from "@/components/ui/button-link";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog.jsx";
+import { toast } from "@/components/ui/toast.jsx";
 import ServiceImage from "@/components/services/service-image.jsx";
 import { serviceManagementApi } from "@/lib/service-management-api.js";
 import {
+  APPROVAL_STATUS_LABELS,
   MODERATION_FILTERS,
   formatServiceCreatedAt,
   moderationActionLabel,
@@ -40,7 +52,7 @@ const EMPTY_ACTIONS = Object.freeze([]);
 function ApprovalBadge({ status }) {
   return (
     <Badge variant={APPROVAL_VARIANTS[status] ?? "outline"}>
-      {status || "unknown"}
+      {APPROVAL_STATUS_LABELS[status] ?? status ?? "Unknown"}
     </Badge>
   );
 }
@@ -208,16 +220,24 @@ export default function AdminServicesPanel() {
 
     const result = await serviceManagementApi.setModerationStatus(serviceId, action);
     if (result.ok) {
-      setNotice(
-        action === "approve" ? "Service approved." : "Service rejected.",
-      );
+      const message = action === "approve" ? "Service approved." : "Service rejected.";
+      setNotice(message);
+      toast.add({
+        type: "success",
+        title: action === "approve" ? "Service approved" : "Service rejected",
+        description: message,
+      });
       closeDetail();
       setPage(1);
       setReloadToken((value) => value + 1);
     } else {
-      setDecisionError(
-        moderationErrorMessage(result, "Unable to update approval status."),
-      );
+      const message = moderationErrorMessage(result, "Unable to update approval status.");
+      setDecisionError(message);
+      toast.add({
+        type: "error",
+        title: "Moderation failed",
+        description: message,
+      });
     }
 
     decisionRef.current = false;
@@ -586,61 +606,54 @@ export default function AdminServicesPanel() {
                     </p>
                   )}
 
-                  {decision ? (
-                    <div
-                      role="alertdialog"
-                      aria-labelledby={`moderation-decision-title-${detail._id}`}
-                      aria-describedby={`moderation-decision-description-${detail._id}`}
-                      className="mt-4 space-y-3 rounded-xl border border-warning/35 bg-warning/8 p-4"
-                    >
-                      <p
-                        id={`moderation-decision-title-${detail._id}`}
-                        className="text-sm font-semibold"
-                      >
-                        {CONFIRMATION_TITLES[decision.action]}
-                      </p>
-                      <p
-                        id={`moderation-decision-description-${detail._id}`}
-                        className="text-sm leading-6 text-muted-foreground"
-                      >
-                        This sets the persisted approval status of “{decision.title}”
-                        to {moderationActionLabel(decision.action).toLowerCase()}.
-                      </p>
+                  <AlertDialog
+                    open={Boolean(decision)}
+                    onOpenChange={(open) => {
+                      if (submittingAction) return;
+                      if (!open) {
+                        setDecision(null);
+                        setDecisionError("");
+                      }
+                    }}
+                  >
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>
+                          {decision ? CONFIRMATION_TITLES[decision.action] : "Confirm decision"}
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                          {decision
+                            ? `This will set the approval status of “${decision.title}” to ${moderationActionLabel(decision.action).toLowerCase()}.`
+                            : "Confirm the moderation decision."}
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
                       {decisionError ? (
                         <p role="alert" className="text-sm text-destructive">
                           {decisionError}
                         </p>
                       ) : null}
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          type="button"
-                          variant={ACTION_VARIANTS[decision.action] ?? "default"}
-                          size="sm"
-                          onClick={handleDecision}
+                      <AlertDialogFooter>
+                        <AlertDialogCancel disabled={Boolean(submittingAction)}>
+                          Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                          variant={decision?.action === "reject" ? "destructive" : "default"}
                           disabled={Boolean(submittingAction)}
                           aria-busy={Boolean(submittingAction)}
+                          onClick={(event) => {
+                            event.preventDefault();
+                            void handleDecision();
+                          }}
                         >
                           {submittingAction
                             ? "Saving…"
-                            : decision.action === "approve"
+                            : decision?.action === "approve"
                               ? "Yes, approve service"
                               : "Yes, reject service"}
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setDecision(null);
-                            setDecisionError("");
-                          }}
-                          disabled={Boolean(submittingAction)}
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                    </div>
-                  ) : null}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               </>
             ) : null}

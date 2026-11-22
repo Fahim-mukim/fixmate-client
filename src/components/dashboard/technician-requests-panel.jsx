@@ -3,9 +3,21 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog.jsx";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { toast } from "@/components/ui/toast.jsx";
 import { bookingApi } from "@/lib/booking-api.js";
+import { serviceManagementApi } from "@/lib/service-management-api.js";
 import {
   DEFAULT_BOOKING_LIMIT,
   bookingErrorMessage,
@@ -23,9 +35,14 @@ import {
   BookingInlineNotice,
   BookingLoading,
 } from "./booking-state.jsx";
+import { DashboardBarChart } from "./dashboard-chart.jsx";
 import BookingPagination from "./pagination.jsx";
 import BookingStatusBadge from "./booking-status-badge.jsx";
-import BookingSummary from "./booking-summary.jsx";
+import { StatCard, StatCardSkeleton, StatsGrid } from "./stat-card.jsx";
+
+const TECHNICIAN_CHART_CONFIG = Object.freeze({
+  value: { label: "Count", color: "var(--chart-2)" },
+});
 
 const ACTION_LABELS = Object.freeze({
   accept: "Accept request",
@@ -40,6 +57,9 @@ export default function TechnicianRequestsPanel({ compact = false }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [stats, setStats] = useState(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [statsError, setStatsError] = useState("");
   const [details, setDetails] = useState({});
   const [detailLoading, setDetailLoading] = useState({});
   const [detailErrors, setDetailErrors] = useState({});
@@ -73,9 +93,42 @@ export default function TechnicianRequestsPanel({ compact = false }) {
     [limit, page, statusFilter],
   );
 
+  const loadStats = useCallback(async () => {
+    setStatsLoading(true);
+    setStatsError("");
+    const [bookingStats, serviceStats] = await Promise.all([
+      bookingApi.getTechnicianBookingStats(),
+      serviceManagementApi.getMyServiceStats(),
+    ]);
+
+    if (bookingStats.ok && serviceStats.ok) {
+      setStats({
+        totalServices: serviceStats.data.totalServices,
+        approvedServices: serviceStats.data.approvedServices,
+        pendingRequests: bookingStats.data.pendingRequests,
+      });
+    } else {
+      setStats(null);
+      const failed = !bookingStats.ok ? bookingStats : serviceStats;
+      setStatsError(
+        bookingErrorMessage(failed, "Unable to load technician statistics."),
+      );
+    }
+    setStatsLoading(false);
+  }, []);
+
   useEffect(() => {
     void Promise.resolve().then(() => load());
   }, [load]);
+
+  useEffect(() => {
+    void Promise.resolve().then(() => loadStats());
+  }, [loadStats]);
+
+  const refreshAll = useCallback(() => {
+    void load();
+    void loadStats();
+  }, [load, loadStats]);
 
   async function handleOpenDetail(id) {
     if (details[id]) return;
@@ -102,11 +155,23 @@ export default function TechnicianRequestsPanel({ compact = false }) {
     if (result.ok) {
       setRejectingId("");
       setAmounts((current) => ({ ...current, [id]: "" }));
-      setActionMessage(`Booking updated to ${result.data?.status ?? action}.`);
+      const statusLabel = result.data?.status ?? action;
+      setActionMessage(`Booking updated to ${statusLabel}.`);
       setDetails((current) => ({ ...current, [id]: result.data }));
+      toast.add({
+        type: "success",
+        title: "Booking updated",
+        description: `${ACTION_LABELS[action] ?? "Booking action"} completed successfully.`,
+      });
       await load();
+      void loadStats();
     } else {
       setActionError(result);
+      toast.add({
+        type: "error",
+        title: "Booking update failed",
+        description: bookingErrorMessage(result, "Unable to update this booking."),
+      });
     }
     setBusyId("");
   }
@@ -139,14 +204,48 @@ export default function TechnicianRequestsPanel({ compact = false }) {
   }
 
   const state = bookingViewState({ loading, error, items: data?.items });
+  const statsChartData = stats
+    ? [
+        { name: "Total services", value: stats.totalServices },
+        { name: "Approved services", value: stats.approvedServices },
+        { name: "Pending requests", value: stats.pendingRequests },
+      ]
+    : [];
 
   return (
     <section aria-labelledby="technician-requests-heading" className="space-y-6">
-      <BookingSummary
-        items={data?.items}
-        total={data?.total}
-        note={compact ? "Most recent requests" : "On this page"}
-      />
+      {statsLoading ? (
+        <StatsGrid label="Technician dashboard statistics">
+          <StatCardSkeleton />
+          <StatCardSkeleton />
+          <StatCardSkeleton />
+        </StatsGrid>
+      ) : statsError ? (
+        <div
+          role="alert"
+          className="rounded-xl border border-danger/35 bg-danger/5 p-4 text-sm text-destructive"
+        >
+          <p>{statsError}</p>
+          <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => void loadStats()}>
+            Retry statistics
+          </Button>
+        </div>
+      ) : stats ? (
+        <div className="space-y-4">
+          <StatsGrid label="Technician dashboard statistics">
+            <StatCard label="Total Services" value={stats.totalServices} note="Services you own" />
+            <StatCard label="Approved Services" value={stats.approvedServices} note="Approved and visible when available" />
+            <StatCard label="Pending Requests" value={stats.pendingRequests} note="Assigned bookings awaiting your response" />
+          </StatsGrid>
+          <DashboardBarChart
+            title="Technician overview"
+            description="Your service and pending request counts from the server."
+            data={statsChartData}
+            config={TECHNICIAN_CHART_CONFIG}
+            emptyMessage="No technician statistics yet. Your chart will appear as your services and requests grow."
+          />
+        </div>
+      ) : null}
 
       {actionMessage ? (
         <BookingInlineNotice>{actionMessage}</BookingInlineNotice>
@@ -163,8 +262,8 @@ export default function TechnicianRequestsPanel({ compact = false }) {
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => load()}
-            disabled={loading}
+            onClick={refreshAll}
+            disabled={loading || statsLoading}
           >
             Refresh requests
           </Button>
@@ -173,8 +272,8 @@ export default function TechnicianRequestsPanel({ compact = false }) {
         <BookingFilters
           status={statusFilter}
           onStatusChange={handleStatusChange}
-          onRefresh={() => load()}
-          refreshing={loading}
+          onRefresh={refreshAll}
+          refreshing={loading || statsLoading}
         />
       )}
 
@@ -293,40 +392,41 @@ export default function TechnicianRequestsPanel({ compact = false }) {
                           })}
                         </div>
 
-                        {rejectingId === booking._id ? (
-                          <div
-                            role="alertdialog"
-                            aria-labelledby={`reject-title-${booking._id}`}
-                            className="space-y-2 rounded-lg border border-danger/30 bg-danger/5 p-3"
-                          >
-                            <p id={`reject-title-${booking._id}`} className="text-sm font-semibold">
-                              Reject this request?
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              Rejection is final and releases the customer’s active slot.
-                            </p>
-                            <div className="flex flex-wrap gap-2">
-                              <Button
-                                type="button"
-                                variant="destructive"
-                                size="sm"
-                                onClick={() => runAction(booking._id, "reject")}
-                                disabled={busyId === booking._id}
-                              >
-                                Yes, reject
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setRejectingId("")}
-                                disabled={busyId === booking._id}
-                              >
+                        <AlertDialog
+                          open={rejectingId === booking._id}
+                          onOpenChange={(open) => {
+                            if (busyId === booking._id) return;
+                            setRejectingId(open ? booking._id : "");
+                          }}
+                        >
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Reject this request?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This will reject the request for{" "}
+                                <span className="font-medium text-foreground">
+                                  {booking.serviceTitle || "this service"}
+                                </span>
+                                . Rejection is final and releases the customer’s active slot.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel disabled={busyId === booking._id}>
                                 Keep request
-                              </Button>
-                            </div>
-                          </div>
-                        ) : null}
+                              </AlertDialogCancel>
+                              <AlertDialogAction
+                                variant="destructive"
+                                disabled={busyId === booking._id}
+                                onClick={(event) => {
+                                  event.preventDefault();
+                                  void runAction(booking._id, "reject");
+                                }}
+                              >
+                                {busyId === booking._id ? "Rejecting…" : "Yes, reject"}
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
 
                         {actions.includes("complete") ? (
                           <div className="space-y-2">

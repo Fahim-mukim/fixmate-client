@@ -5,9 +5,23 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import ButtonLink from "@/components/ui/button-link";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog.jsx";
+import { toast } from "@/components/ui/toast.jsx";
 import { Skeleton } from "@/components/ui/skeleton";
 import { serviceManagementApi } from "@/lib/service-management-api.js";
-import { serviceErrorMessage } from "@/lib/service-management-contract.js";
+import {
+  APPROVAL_STATUS_LABELS,
+  serviceErrorMessage,
+} from "@/lib/service-management-contract.js";
 import { formatPrice } from "@/lib/service-utils.js";
 import ServiceImage from "@/components/services/service-image.jsx";
 import BookingPagination from "./pagination.jsx";
@@ -91,15 +105,20 @@ export default function TechnicianServicesPanel() {
     if (result.ok) {
       setDeleteCandidate(null);
       setNotice("Service deleted.");
+      toast.add({
+        type: "success",
+        title: "Service deleted",
+        description: "The service was deleted.",
+      });
       setEditingService((current) =>
         current?._id === deleteCandidate._id ? null : current,
       );
       setPage(1);
       await load(1);
     } else {
-      setDeleteError(
-        serviceErrorMessage(result, "Unable to delete this service."),
-      );
+      const message = serviceErrorMessage(result, "Unable to delete this service.");
+      setDeleteError(message);
+      toast.add({ type: "error", title: "Delete failed", description: message });
     }
 
     deletingRef.current = false;
@@ -219,7 +238,7 @@ export default function TechnicianServicesPanel() {
                         APPROVAL_VARIANTS[service.approvalStatus] ?? "outline"
                       }
                     >
-                      {service.approvalStatus || "unknown"} approval
+                      {APPROVAL_STATUS_LABELS[service.approvalStatus] ?? service.approvalStatus ?? "Unknown"} approval
                     </Badge>
                   </div>
 
@@ -282,54 +301,46 @@ export default function TechnicianServicesPanel() {
                     </Button>
                   </div>
 
-                  {deleteCandidate?._id === service._id ? (
-                    <div
-                      role="alertdialog"
-                      aria-labelledby={`delete-service-title-${service._id}`}
-                      aria-describedby={`delete-service-description-${service._id}`}
-                      className="space-y-3 rounded-lg border border-danger/30 bg-danger/5 p-3"
-                    >
-                      <p
-                        id={`delete-service-title-${service._id}`}
-                        className="text-sm font-semibold"
-                      >
-                        Delete “{service.title}”?
-                      </p>
-                      <p
-                        id={`delete-service-description-${service._id}`}
-                        className="text-sm leading-6 text-muted-foreground"
-                      >
-                        This cannot be undone. The service stays listed until the
-                        server confirms deletion.
-                      </p>
+                  <AlertDialog
+                    open={deleteCandidate?._id === service._id}
+                    onOpenChange={(open) => {
+                      if (deletingId) return;
+                      if (!open) {
+                        setDeleteCandidate(null);
+                        setDeleteError("");
+                      }
+                    }}
+                  >
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete “{service.title}”?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This cannot be undone. The service will only be removed after the server
+                          confirms deletion.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
                       {deleteError ? (
                         <p role="alert" className="text-sm text-destructive">
                           {deleteError}
                         </p>
                       ) : null}
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          type="button"
+                      <AlertDialogFooter>
+                        <AlertDialogCancel disabled={Boolean(deletingId)}>
+                          Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction
                           variant="destructive"
-                          size="sm"
-                          onClick={handleDelete}
                           disabled={Boolean(deletingId)}
-                          aria-busy={deleting}
+                          onClick={(event) => {
+                            event.preventDefault();
+                            void handleDelete();
+                          }}
                         >
                           {deleting ? "Deleting…" : "Yes, delete service"}
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setDeleteCandidate(null)}
-                          disabled={Boolean(deletingId)}
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                    </div>
-                  ) : null}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               </article>
             );

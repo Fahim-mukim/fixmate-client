@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { toast } from "@/components/ui/toast.jsx";
 import {
   ALLOWED_IMAGE_MIME_TYPES,
   MAX_IMAGE_BYTES,
@@ -92,10 +93,12 @@ export default function ImageUploadField({
     try {
       const result = await uploadApi.uploadImage(purpose, file);
       if (!result.ok || !result.data?.imageUrl) {
+        const errorMessage = result.message || "Upload failed. Please try again.";
         if (mountedRef.current) {
           setStatus("error");
-          setMessage(result.message || "Upload failed. Please try again.");
+          setMessage(errorMessage);
         }
+        toast.add({ type: "error", title: "Upload failed", description: errorMessage });
         return;
       }
 
@@ -114,10 +117,12 @@ export default function ImageUploadField({
         // The hosted image URL is authoritative even if a context refresh fails.
       }
     } catch {
+      const errorMessage = "Upload failed. Please try again.";
       if (mountedRef.current) {
         setStatus("error");
-        setMessage("Upload failed. Please try again.");
+        setMessage(errorMessage);
       }
+      toast.add({ type: "error", title: "Upload failed", description: errorMessage });
     } finally {
       uploadingRef.current = false;
     }

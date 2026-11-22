@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/toast.jsx";
 import { paymentApi } from "@/lib/payment-api.js";
 import { createSubmissionGuard } from "@/lib/booking-contract.js";
 import {
@@ -27,16 +28,17 @@ export default function CustomerPayNowButton({ booking, role }) {
       const result = await paymentApi.startCheckout(booking._id);
 
       if (!result.ok) {
-        setState({ status: "error", message: checkoutErrorMessage(result) });
+        const message = checkoutErrorMessage(result);
+        setState({ status: "error", message });
+        toast.add({ type: "error", title: "Checkout failed", description: message });
         return;
       }
 
       const checkoutUrl = readCheckoutRedirect(result.data);
       if (!checkoutUrl) {
-        setState({
-          status: "error",
-          message: "The payment response could not be verified. Try again.",
-        });
+        const message = "The payment response could not be verified. Try again.";
+        setState({ status: "error", message });
+        toast.add({ type: "error", title: "Checkout failed", description: message });
         return;
       }
 

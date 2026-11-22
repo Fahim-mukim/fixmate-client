@@ -117,6 +117,12 @@ export function resolveUpstreamPath(method, segments = []) {
       return `/${parts[0]}`;
     }
     if (parts.length === 1 && isValidBookingId(parts[0])) return `/${parts[0]}`;
+    if (parts.length === 2 && parts[0] === "mine" && parts[1] === "stats") {
+      return "/mine/stats";
+    }
+    if (parts.length === 2 && parts[0] === "technician" && parts[1] === "stats") {
+      return "/technician/stats";
+    }
     if (parts.length === 2 && parts[0] === "technician" && isValidBookingId(parts[1])) {
       return `/technician/${parts[1]}`;
     }

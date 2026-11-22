@@ -56,7 +56,7 @@ test("customer UI exposes cancellation only for requested bookings with confirma
   const panel = source("src/components/dashboard/customer-bookings-panel.jsx");
   assert.match(panel, /canCustomerCancel/);
   assert.match(panel, /bookingApi\.cancelBooking/);
-  assert.match(panel, /role="alertdialog"/);
+  assert.match(panel, /AlertDialog/);
   assert.match(panel, /<CustomerPayNowButton booking=\{booking\} role="customer" \/>/);
   assert.ok(!panel.includes("paymentApi.startCheckout"));
 });
@@ -66,7 +66,7 @@ test("technician UI follows the allowed transition table and validates final amo
   assert.match(panel, /getTechnicianActions/);
   assert.match(panel, /parsePositiveAmount/);
   assert.match(panel, /bookingApi\.updateBookingStatus/);
-  assert.match(panel, /role="alertdialog"/);
+  assert.match(panel, /AlertDialog/);
 });
 
 test("admin booking UI is read-only for statuses and payments", () => {

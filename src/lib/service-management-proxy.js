@@ -28,6 +28,10 @@ function errorResponse(status, code, message) {
   return Response.json({ success: false, error: { code, message } }, { status });
 }
 
+function isMineStats(method, parts) {
+  return method === "GET" && parts.length === 2 && parts[0] === "mine" && parts[1] === "stats";
+}
+
 function isModerationList(method, parts) {
   return method === "GET" && parts.length === 1 && parts[0] === "moderation";
 }
@@ -58,6 +62,7 @@ export function resolveServiceUpstreamPath(method, segments = []) {
     if (parts.length === 0 || (parts.length === 1 && parts[0] === "mine")) {
       return "/mine";
     }
+    if (isMineStats(method, parts)) return "/mine/stats";
     if (isModerationList(method, parts)) return "/moderation";
     if (isModerationDetail(method, parts)) return `/moderation/${parts[1]}`;
     return null;
@@ -211,11 +216,12 @@ export function createServiceManagementProxyHandler({
 
     let query = "";
     if (method === "GET") {
-      const allowedKeys = isModerationList(method, parts)
-        ? MODERATION_QUERY_KEYS
-        : isModerationDetail(method, parts)
-          ? EMPTY_QUERY_KEYS
-          : ALLOWED_QUERY_KEYS;
+      const allowedKeys =
+        isModerationList(method, parts)
+          ? MODERATION_QUERY_KEYS
+          : isModerationDetail(method, parts) || isMineStats(method, parts)
+            ? EMPTY_QUERY_KEYS
+            : ALLOWED_QUERY_KEYS;
       const resolvedQuery = resolveQuery(searchParams, allowedKeys);
       if (resolvedQuery === null) {
         return errorResponse(400, "INVALID_QUERY", "Service query is not supported.");

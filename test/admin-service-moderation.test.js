@@ -89,7 +89,7 @@ test("admin panel requires full detail review before showing allowed decisions",
   assert.match(panel, /moderationActionsForStatus\(detail\.approvalStatus\)/);
   assert.match(panel, /actions\.map\(\(action\)/);
   assert.match(panel, /beginDecision\(action\)/);
-  assert.match(panel, /role="alertdialog"/);
+  assert.match(panel, /AlertDialog/);
   assert.match(panel, /Yes, approve service/);
   assert.match(panel, /Yes, reject service/);
   assert.ok(!panel.includes("serviceManagementApi.updateService"));

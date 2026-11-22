@@ -33,6 +33,8 @@ test("booking proxy requests allow only documented path shapes and query keys", 
     resolveUpstreamPath("GET", ["mine"]),
     "/mine",
   );
+  assert.equal(resolveUpstreamPath("GET", ["mine", "stats"]), "/mine/stats");
+  assert.equal(resolveUpstreamPath("GET", ["technician", "stats"]), "/technician/stats");
   assert.equal(
     resolveUpstreamPath("PATCH", ["507f1f77bcf86cd799439012", "status"]),
     "/507f1f77bcf86cd799439012/status",

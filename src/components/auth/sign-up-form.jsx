@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { toast } from "@/components/ui/toast.jsx";
 import { authClient } from "@/lib/auth-client";
 import { clearAccessToken } from "@/lib/auth-token";
 import { REGISTRATION_ROLES, assertRegistrationRole } from "@/lib/registration";
@@ -65,20 +66,25 @@ export default function SignUpForm() {
       });
 
       if (response.error) {
+        const errorMessage = messageFrom(response.error, "Registration failed.");
         setStatus("error");
-        setMessage(messageFrom(response.error, "Registration failed."));
+        setMessage(errorMessage);
+        toast.add({ type: "error", title: "Registration failed", description: errorMessage });
         return;
       }
 
       setStatus("success");
       setMessage("Account created.");
+      toast.add({ type: "success", title: "Account created", description: "Your FixMate account is ready." });
       const search = typeof window === "undefined" ? "" : window.location.search;
       const destination = await resolvePostAuthPath(search, getCurrentApplicationUser);
       router.push(destination);
       router.refresh();
     } catch {
+      const errorMessage = "Registration is temporarily unavailable.";
       setStatus("error");
-      setMessage("Registration is temporarily unavailable.");
+      setMessage(errorMessage);
+      toast.add({ type: "error", title: "Registration failed", description: errorMessage });
     }
   }
 

@@ -37,6 +37,7 @@ export function resolveAdminUserUpstreamPath(method, segments = []) {
 
   if (method === "GET") {
     if (parts.length === 0) return "";
+    if (parts.length === 1 && parts[0] === "stats") return "/stats";
     if (parts.length === 1 && isValidAdminUserId(parts[0])) return `/${parts[0]}`;
     return null;
   }

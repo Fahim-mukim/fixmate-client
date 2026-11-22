@@ -57,6 +57,10 @@ export function createAdminUserApiClient({
     return request("", query.query);
   }
 
+  function getAdminStats() {
+    return request("/stats");
+  }
+
   function getAdminUser(id) {
     if (!isValidAdminUserId(id)) {
       return Promise.resolve(failure(400, "INVALID_ADMIN_USER_ID", "Invalid user id."));
@@ -79,5 +83,10 @@ export function createAdminUserApiClient({
     });
   }
 
-  return Object.freeze({ listAdminUsers, getAdminUser, updateAdminUserRole });
+  return Object.freeze({
+    listAdminUsers,
+    getAdminStats,
+    getAdminUser,
+    updateAdminUserRole,
+  });
 }

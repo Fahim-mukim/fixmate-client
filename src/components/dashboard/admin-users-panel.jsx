@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import ButtonLink from "@/components/ui/button-link";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "@/components/ui/toast.jsx";
 import { adminUserApi } from "@/lib/admin-user-api.js";
 import {
   USER_ROLES,
@@ -298,11 +299,9 @@ export default function AdminUsersPanel() {
     try {
       const result = await adminUserApi.updateAdminUserRole(id, role);
       if (!result.ok || !result.data) {
-        setMutation({
-          status: "error",
-          userId: id,
-          message: adminUserRoleErrorMessage(result),
-        });
+        const message = adminUserRoleErrorMessage(result);
+        setMutation({ status: "error", userId: id, message });
+        toast.add({ type: "error", title: "Role update failed", description: message });
         return;
       }
 
@@ -318,13 +317,9 @@ export default function AdminUsersPanel() {
           : current
       ));
       setRoleDrafts((current) => ({ ...current, [id]: updated.role }));
-      setMutation({
-        status: "success",
-        userId: id,
-        message: `${updated.name || "User"} is now ${
-          ROLE_LABELS[updated.role] || updated.role
-        }.`,
-      });
+      const message = `${updated.name || "User"} is now ${ROLE_LABELS[updated.role] || updated.role}.`;
+      setMutation({ status: "success", userId: id, message });
+      toast.add({ type: "success", title: "Role updated", description: message });
 
       if (selectedUser?.id === id) void openDetail(updated);
       setReloadToken((value) => value + 1);

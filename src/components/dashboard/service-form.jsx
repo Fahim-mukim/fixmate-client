@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import ButtonLink from "@/components/ui/button-link";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { toast } from "@/components/ui/toast.jsx";
 import {
   NativeSelect,
   NativeSelectOption,
@@ -80,38 +81,50 @@ export default function ServiceForm({
         : await serviceManagementApi.createService(form);
 
       if (!result.ok) {
+        const errorMessage = serviceErrorMessage(
+          result,
+          editing ? "Unable to update this service." : "Unable to create this service.",
+        );
         if (mountedRef.current) {
           setStatus("error");
-          setMessage(
-            serviceErrorMessage(
-              result,
-              editing
-                ? "Unable to update this service."
-                : "Unable to create this service.",
-            ),
-          );
+          setMessage(errorMessage);
         }
+        toast.add({
+          type: "error",
+          title: editing ? "Service update failed" : "Service creation failed",
+          description: errorMessage,
+        });
         return;
       }
 
+      const successMessage = editing
+        ? result.data?.approvalStatus === "pending"
+          ? "Service updated and sent for re-approval."
+          : "Service updated."
+        : "Service submitted for approval.";
       if (mountedRef.current) {
         setStatus("success");
-        setMessage(
-          editing
-            ? "Service updated and returned to pending approval."
-            : "Service submitted for approval.",
-        );
+        setMessage(successMessage);
       }
+      toast.add({
+        type: "success",
+        title: editing ? "Service updated" : "Service submitted",
+        description: successMessage,
+      });
       onSuccess?.(result.data);
     } catch {
+      const errorMessage = editing
+        ? "Unable to update this service."
+        : "Unable to create this service.";
       if (mountedRef.current) {
         setStatus("error");
-        setMessage(
-          editing
-            ? "Unable to update this service."
-            : "Unable to create this service.",
-        );
+        setMessage(errorMessage);
       }
+      toast.add({
+        type: "error",
+        title: editing ? "Service update failed" : "Service creation failed",
+        description: errorMessage,
+      });
     } finally {
       submittingRef.current = false;
     }

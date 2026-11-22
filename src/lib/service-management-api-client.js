@@ -65,6 +65,10 @@ export function createServiceManagementApiClient({
     return request("GET", "", { query: query.query });
   }
 
+  function getMyServiceStats() {
+    return request("GET", "/mine/stats");
+  }
+
   function createService(input) {
     let body;
     try {
@@ -137,6 +141,7 @@ export function createServiceManagementApiClient({
 
   return Object.freeze({
     listOwnedServices,
+    getMyServiceStats,
     createService,
     updateService,
     deleteService,

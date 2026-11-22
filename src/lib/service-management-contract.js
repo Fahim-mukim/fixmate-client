@@ -30,6 +30,12 @@ export const APPROVAL_STATUSES = Object.freeze([
   "rejected",
 ]);
 
+export const APPROVAL_STATUS_LABELS = Object.freeze({
+  pending: "Pending",
+  approved: "Approved",
+  rejected: "Rejected",
+});
+
 // Mirrors the Server's parseModerationListQuery allowlist. The moderation API
 // does not support search, so the Client must not offer a misleading search box.
 export const MODERATION_FILTERS = Object.freeze([

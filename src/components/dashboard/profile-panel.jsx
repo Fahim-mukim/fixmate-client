@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { toast } from "@/components/ui/toast.jsx";
 import { useSession } from "@/lib/auth-client.js";
 import { BOOKING_ROLE_LABELS } from "@/lib/dashboard-navigation.js";
 import { profileApi } from "@/lib/profile-api.js";
@@ -126,13 +127,11 @@ export default function ProfilePanel() {
     try {
       const result = await profileApi.updateProfile(buildProfileUpdateBody(form));
       if (!result.ok || !result.data) {
+        const message = result.message || "Unable to save your profile.";
         if (mountedRef.current) {
-          setState((current) => ({
-            ...current,
-            status: "error",
-            message: result.message || "Unable to save your profile.",
-          }));
+          setState((current) => ({ ...current, status: "error", message }));
         }
+        toast.add({ type: "error", title: "Profile update failed", description: message });
         return;
       }
 
@@ -144,6 +143,7 @@ export default function ProfilePanel() {
         setForm(profileFormFromUser(displayed));
         setState({ status: "success", profile: displayed, message: "Profile updated." });
       }
+      toast.add({ type: "success", title: "Profile updated", description: "Your profile was saved." });
 
       // Keep the shared navbar/dashboard identity and the dashboard user
       // context aligned with the canonical user record.
@@ -159,13 +159,11 @@ export default function ProfilePanel() {
         // The saved profile response remains authoritative for this page.
       }
     } catch {
+      const message = "Unable to save your profile.";
       if (mountedRef.current) {
-        setState((current) => ({
-          ...current,
-          status: "error",
-          message: "Unable to save your profile.",
-        }));
+        setState((current) => ({ ...current, status: "error", message }));
       }
+      toast.add({ type: "error", title: "Profile update failed", description: message });
     } finally {
       savingRef.current = false;
     }
@@ -180,6 +178,7 @@ export default function ProfilePanel() {
       profile: nextProfile,
       message: "Profile photo updated.",
     });
+    toast.add({ type: "success", title: "Profile photo updated", description: "Your profile photo was uploaded." });
 
     // Keep the navbar/dashboard avatar aligned with the canonical user record.
     setSessionIdentity(nextProfile);

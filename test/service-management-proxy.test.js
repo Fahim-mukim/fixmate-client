@@ -37,6 +37,7 @@ test("service proxy maps only documented same-origin paths to real server routes
   assert.deepEqual([...SERVICE_PROXY_METHODS], ["GET", "POST", "PATCH", "DELETE"]);
   assert.equal(resolveServiceUpstreamPath("GET", []), "/mine");
   assert.equal(resolveServiceUpstreamPath("GET", ["mine"]), "/mine");
+  assert.equal(resolveServiceUpstreamPath("GET", ["mine", "stats"]), "/mine/stats");
   assert.equal(resolveServiceUpstreamPath("GET", ["moderation"]), "/moderation");
   assert.equal(
     resolveServiceUpstreamPath("GET", ["moderation", SERVICE_ID]),

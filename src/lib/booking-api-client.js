@@ -78,6 +78,10 @@ export function createBookingApiClient({
     return request("GET", ["mine"], { query: buildBookingListQuery(query) });
   }
 
+  function getMyBookingStats() {
+    return request("GET", ["mine", "stats"]);
+  }
+
   function getBooking(id) {
     if (!isValidBookingId(id)) {
       return Promise.resolve({
@@ -104,6 +108,10 @@ export function createBookingApiClient({
 
   function listTechnicianBookings(query = {}) {
     return request("GET", ["technician"], { query: buildBookingListQuery(query) });
+  }
+
+  function getTechnicianBookingStats() {
+    return request("GET", ["technician", "stats"]);
   }
 
   function getTechnicianBooking(id) {
@@ -149,9 +157,11 @@ export function createBookingApiClient({
   return Object.freeze({
     createBooking,
     listMyBookings,
+    getMyBookingStats,
     getBooking,
     cancelBooking,
     listTechnicianBookings,
+    getTechnicianBookingStats,
     getTechnicianBooking,
     updateBookingStatus,
     listAdminBookings,

@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { toast } from "@/components/ui/toast.jsx";
 import { bookingApi } from "@/lib/booking-api.js";
 import {
   bookingErrorMessage,
@@ -76,15 +77,13 @@ export default function BookingRequestPanel({ serviceId, serviceTitle }) {
       const body = buildBookingCreateBody(input);
       const result = await bookingApi.createBooking(body);
       if (result.ok) {
-        setSubmitState({
-          status: "success",
-          message: `Your request for ${serviceTitle} was sent.`,
-        });
+        const message = `Your request for ${serviceTitle} was sent.`;
+        setSubmitState({ status: "success", message });
+        toast.add({ type: "success", title: "Request sent", description: message });
       } else {
-        setSubmitState({
-          status: "error",
-          message: bookingErrorMessage(result, "Unable to send this request."),
-        });
+        const message = bookingErrorMessage(result, "Unable to send this request.");
+        setSubmitState({ status: "error", message });
+        toast.add({ type: "error", title: "Request failed", description: message });
       }
     } finally {
       submissionGuard.current.finish();

@@ -4,6 +4,17 @@ import { useCallback, useEffect, useState } from "react";
 
 import ButtonLink from "@/components/ui/button-link";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog.jsx";
+import { toast } from "@/components/ui/toast.jsx";
 import { bookingApi } from "@/lib/booking-api.js";
 import {
   DEFAULT_BOOKING_LIMIT,
@@ -22,9 +33,14 @@ import {
   BookingInlineNotice,
   BookingLoading,
 } from "./booking-state.jsx";
+import { DashboardBarChart } from "./dashboard-chart.jsx";
 import BookingPagination from "./pagination.jsx";
 import BookingStatusBadge from "./booking-status-badge.jsx";
-import BookingSummary from "./booking-summary.jsx";
+import { StatCard, StatCardSkeleton, StatsGrid } from "./stat-card.jsx";
+
+const CUSTOMER_CHART_CONFIG = Object.freeze({
+  value: { label: "Bookings", color: "var(--chart-1)" },
+});
 
 export default function CustomerBookingsPanel({ compact = false }) {
   const [page, setPage] = useState(1);
@@ -32,6 +48,9 @@ export default function CustomerBookingsPanel({ compact = false }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [stats, setStats] = useState(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [statsError, setStatsError] = useState("");
   const [details, setDetails] = useState({});
   const [detailLoading, setDetailLoading] = useState({});
   const [detailErrors, setDetailErrors] = useState({});
@@ -63,9 +82,31 @@ export default function CustomerBookingsPanel({ compact = false }) {
     [limit, page, statusFilter],
   );
 
+  const loadStats = useCallback(async () => {
+    setStatsLoading(true);
+    setStatsError("");
+    const result = await bookingApi.getMyBookingStats();
+    if (result.ok) {
+      setStats(result.data);
+    } else {
+      setStats(null);
+      setStatsError(bookingErrorMessage(result, "Unable to load booking statistics."));
+    }
+    setStatsLoading(false);
+  }, []);
+
   useEffect(() => {
     void Promise.resolve().then(() => load());
   }, [load]);
+
+  useEffect(() => {
+    void Promise.resolve().then(() => loadStats());
+  }, [loadStats]);
+
+  const refreshAll = useCallback(() => {
+    void load();
+    void loadStats();
+  }, [load, loadStats]);
 
   async function handleOpenDetail(id) {
     if (details[id]) return;
@@ -92,9 +133,20 @@ export default function CustomerBookingsPanel({ compact = false }) {
     if (result.ok) {
       setConfirmingId("");
       setActionMessage("The request was cancelled.");
+      toast.add({
+        type: "success",
+        title: "Booking cancelled",
+        description: "The booking request was cancelled.",
+      });
       await load();
+      void loadStats();
     } else {
       setActionError(result);
+      toast.add({
+        type: "error",
+        title: "Cancellation failed",
+        description: bookingErrorMessage(result, "Unable to cancel this booking."),
+      });
     }
     setBusyId("");
   }
@@ -106,14 +158,48 @@ export default function CustomerBookingsPanel({ compact = false }) {
   }
 
   const state = bookingViewState({ loading, error, items: data?.items });
+  const statsChartData = stats
+    ? [
+        { name: "Total requests", value: stats.totalRequests },
+        { name: "Active jobs", value: stats.activeJobs },
+        { name: "Completed", value: stats.completedJobs },
+      ]
+    : [];
 
   return (
     <section aria-labelledby="customer-bookings-heading" className="space-y-6">
-      <BookingSummary
-        items={data?.items}
-        total={data?.total}
-        note={compact ? "Most recent bookings" : "On this page"}
-      />
+      {statsLoading ? (
+        <StatsGrid label="Customer booking statistics">
+          <StatCardSkeleton />
+          <StatCardSkeleton />
+          <StatCardSkeleton />
+        </StatsGrid>
+      ) : statsError ? (
+        <div
+          role="alert"
+          className="rounded-xl border border-danger/35 bg-danger/5 p-4 text-sm text-destructive"
+        >
+          <p>{statsError}</p>
+          <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => void loadStats()}>
+            Retry statistics
+          </Button>
+        </div>
+      ) : stats ? (
+        <div className="space-y-4">
+          <StatsGrid label="Customer booking statistics">
+            <StatCard label="Total Requests" value={stats.totalRequests} note="All your booking requests" />
+            <StatCard label="Active Jobs" value={stats.activeJobs} note="Requested, accepted, or in progress" />
+            <StatCard label="Completed Jobs" value={stats.completedJobs} note="Completed requests" />
+          </StatsGrid>
+          <DashboardBarChart
+            title="Booking overview"
+            description="Your booking counts by status group."
+            data={statsChartData}
+            config={CUSTOMER_CHART_CONFIG}
+            emptyMessage="No booking requests yet. Your chart will appear after you create a request."
+          />
+        </div>
+      ) : null}
 
       {actionMessage ? (
         <BookingInlineNotice>{actionMessage}</BookingInlineNotice>
@@ -134,8 +220,8 @@ export default function CustomerBookingsPanel({ compact = false }) {
         <BookingFilters
           status={statusFilter}
           onStatusChange={handleStatusChange}
-          onRefresh={() => load()}
-          refreshing={loading}
+          onRefresh={refreshAll}
+          refreshing={loading || statsLoading}
         />
       )}
 
@@ -226,11 +312,17 @@ export default function CustomerBookingsPanel({ compact = false }) {
 
                   {canCustomerCancel(booking) ? (
                     <div className="mt-4 rounded-lg border border-border bg-mist p-3 dark:bg-surface-alt">
-                      {confirmingId !== booking._id ? (
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <p className="text-sm text-muted-foreground">
-                            Not needed anymore? You can cancel while it is requested.
-                          </p>
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <p className="text-sm text-muted-foreground">
+                          Not needed anymore? You can cancel while it is requested.
+                        </p>
+                        <AlertDialog
+                          open={confirmingId === booking._id}
+                          onOpenChange={(open) => {
+                            if (busyId === booking._id) return;
+                            setConfirmingId(open ? booking._id : "");
+                          }}
+                        >
                           <Button
                             type="button"
                             variant="destructive"
@@ -239,42 +331,38 @@ export default function CustomerBookingsPanel({ compact = false }) {
                           >
                             Cancel request
                           </Button>
-                        </div>
-                      ) : (
-                        <div
-                          role="alertdialog"
-                          aria-labelledby={`cancel-title-${booking._id}`}
-                          className="space-y-3"
-                        >
-                          <p id={`cancel-title-${booking._id}`} className="text-sm font-semibold">
-                            Cancel this booking request?
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            This cannot be undone. You can request the service again later.
-                          </p>
-                          <div className="flex flex-wrap gap-2">
-                            <Button
-                              type="button"
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => handleCancel(booking._id)}
-                              disabled={busyId === booking._id}
-                              aria-busy={busyId === booking._id}
-                            >
-                              {busyId === booking._id ? "Cancelling…" : "Yes, cancel request"}
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setConfirmingId("")}
-                              disabled={busyId === booking._id}
-                            >
-                              Keep booking
-                            </Button>
-                          </div>
-                        </div>
-                      )}
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Cancel this booking request?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This will cancel your request for{" "}
+                                <span className="font-medium text-foreground">
+                                  {booking.serviceTitle || "this service"}
+                                </span>
+                                . This cannot be undone. You can request the service again later.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel
+                                disabled={busyId === booking._id}
+                                onClick={() => setConfirmingId("")}
+                              >
+                                Keep booking
+                              </AlertDialogCancel>
+                              <AlertDialogAction
+                                variant="destructive"
+                                disabled={busyId === booking._id}
+                                onClick={(event) => {
+                                  event.preventDefault();
+                                  void handleCancel(booking._id);
+                                }}
+                              >
+                                {busyId === booking._id ? "Cancelling…" : "Yes, cancel request"}
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
                     </div>
                   ) : null}
                 </BookingDetail>

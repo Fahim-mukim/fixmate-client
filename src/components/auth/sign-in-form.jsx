@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { toast } from "@/components/ui/toast.jsx";
 import { clearAccessToken } from "@/lib/auth-token";
 import { authClient } from "@/lib/auth-client";
 import { getCurrentApplicationUser } from "@/lib/protected-api.js";
@@ -45,20 +46,25 @@ export default function SignInForm() {
       });
 
       if (response.error) {
+        const errorMessage = messageFrom(response.error, "Sign-in failed.");
         setStatus("error");
-        setMessage(messageFrom(response.error, "Sign-in failed."));
+        setMessage(errorMessage);
+        toast.add({ type: "error", title: "Sign-in failed", description: errorMessage });
         return;
       }
 
       setStatus("success");
       setMessage("Signed in.");
+      toast.add({ type: "success", title: "Signed in", description: "Welcome back to FixMate." });
       const search = typeof window === "undefined" ? "" : window.location.search;
       const destination = await resolvePostAuthPath(search, getCurrentApplicationUser);
       router.push(destination);
       router.refresh();
     } catch {
+      const errorMessage = "Sign-in is temporarily unavailable.";
       setStatus("error");
-      setMessage("Sign-in is temporarily unavailable.");
+      setMessage(errorMessage);
+      toast.add({ type: "error", title: "Sign-in failed", description: errorMessage });
     }
   }
 

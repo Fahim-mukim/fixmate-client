@@ -25,6 +25,7 @@ test("admin user proxy maps list, detail GET, and role PATCH routes", () => {
   assert.equal(ADMIN_USER_UPSTREAM_PATH, "/api/admin/users");
   assert.deepEqual([...ADMIN_USER_PROXY_METHODS], ["GET", "PATCH"]);
   assert.equal(resolveAdminUserUpstreamPath("GET", []), "");
+  assert.equal(resolveAdminUserUpstreamPath("GET", ["stats"]), "/stats");
   assert.equal(resolveAdminUserUpstreamPath("GET", [USER_ID]), `/${USER_ID}`);
   assert.equal(resolveAdminUserUpstreamPath("GET", ["not-an-id"]), null);
   assert.equal(resolveAdminUserUpstreamPath("GET", [USER_ID, "extra"]), null);

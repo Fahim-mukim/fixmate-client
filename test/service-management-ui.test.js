@@ -85,7 +85,8 @@ test("service form exposes all required fields and uses the trusted two-step ima
   assert.match(field, /Retry upload/);
   assert.match(field, /role=\{status === "error" \? "alert"/);
   assert.ok(!form.includes("technicianId"));
-  assert.ok(!form.includes("approvalStatus"));
+  assert.ok(!/name=["']approvalStatus["']/.test(form));
+  assert.ok(!/approvalStatus\s*:/.test(form));
 });
 
 test("service form prevents duplicate submission and explains create and edit outcomes", () => {
@@ -97,7 +98,7 @@ test("service form prevents duplicate submission and explains create and edit ou
   assert.match(form, /disabled=\{saving\}/);
   assert.match(form, /Service submitted for approval\./);
   assert.match(form, /serviceManagementApi\.updateService\(initialService\?\._id, form\)/);
-  assert.match(form, /Service updated and returned to pending approval\./);
+  assert.match(form, /Service updated and sent for re-approval\./);
   assert.match(form, /Editing a service resets its approval status to pending/);
   assert.match(form, /not be\s+publicly visible until an Admin approves it again/);
 });
@@ -141,13 +142,13 @@ test("delete requires confirmation, waits for server success, and explains confl
   const contract = source("src/lib/service-management-contract.js");
 
   assert.match(panel, /setDeleteCandidate\(service\)/);
-  assert.match(panel, /role="alertdialog"/);
+  assert.match(panel, /AlertDialog/);
   assert.match(panel, /Yes, delete service/);
   assert.match(panel, /if \(deletingRef\.current \|\| !deleteCandidate\?\._id\) return/);
   assert.match(panel, /const result = await serviceManagementApi\.deleteService\(deleteCandidate\._id\)/);
   assert.match(panel, /if \(result\.ok\) \{/);
   assert.match(panel, /setNotice\("Service deleted\."\)/);
-  assert.match(panel, /The service stays listed until the\s+server confirms deletion\./);
+  assert.match(panel, /only be removed after the server\s+confirms deletion\./);
   assert.ok(
     !/setData\(\(current\) => current\.items\.filter/.test(panel),
     "the UI must not remove a service before the server confirms deletion",
