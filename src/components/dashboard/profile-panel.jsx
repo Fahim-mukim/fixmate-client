@@ -54,17 +54,40 @@ function ProfileSkeleton() {
   );
 }
 
+function normalizeProfile(profile, fallback = null) {
+  const source = profile && typeof profile === "object" ? profile : null;
+  const base = fallback && typeof fallback === "object" ? fallback : null;
+  if (!source && !base) return null;
+
+  return {
+    id: typeof source?.id === "string" ? source.id : typeof base?.id === "string" ? base.id : "",
+    name: typeof source?.name === "string" ? source.name : typeof base?.name === "string" ? base.name : "",
+    email: typeof source?.email === "string" ? source.email : typeof base?.email === "string" ? base.email : "",
+    image:
+      typeof source?.image === "string" || source?.image === null
+        ? source.image
+        : typeof base?.image === "string" || base?.image === null
+          ? base.image
+          : null,
+    role: typeof source?.role === "string" ? source.role : typeof base?.role === "string" ? base.role : "",
+    phone: typeof source?.phone === "string" ? source.phone : typeof base?.phone === "string" ? base.phone : "",
+    area: typeof source?.area === "string" ? source.area : typeof base?.area === "string" ? base.area : "",
+    bio: typeof source?.bio === "string" ? source.bio : typeof base?.bio === "string" ? base.bio : "",
+  };
+}
+
 export default function ProfilePanel() {
   const dashboardUser = useDashboardUser();
   const refreshUser = useDashboardUserRefresh();
-  const { refetch: refetchSession } = useSession();
+  const session = useSession();
+  const refetchSession = session?.refetch;
   const [attempt, setAttempt] = useState(0);
-  const [state, setState] = useState({
+  const [state, setState] = useState(() => ({
     status: "loading",
-    profile: null,
+    profile: normalizeProfile(dashboardUser),
     message: "",
-  });
-  const [form, setForm] = useState(EMPTY_FORM);
+  }));
+  const [form, setForm] = useState(() => profileFormFromUser(dashboardUser));
   const [errors, setErrors] = useState({});
   const savingRef = useRef(false);
   const mountedRef = useRef(true);
@@ -117,7 +140,7 @@ export default function ProfilePanel() {
     setErrors(validation);
     const firstError = Object.values(validation)[0];
     if (firstError) {
-      setState((current) => ({ ...current, status: "error", message: firstError }));
+      setState((current) => ({ ...current, status: "ready", message: firstError }));
       return;
     }
 
@@ -129,19 +152,40 @@ export default function ProfilePanel() {
       if (!result.ok || !result.data) {
         const message = result.message || "Unable to save your profile.";
         if (mountedRef.current) {
-          setState((current) => ({ ...current, status: "error", message }));
+          setState((current) => ({
+            ...current,
+            status: "ready",
+            profile: normalizeProfile(current.profile, dashboardUser),
+            message,
+          }));
         }
         toast.add({ type: "error", title: "Profile update failed", description: message });
         return;
       }
 
-      let displayed = result.data;
-      const refreshed = await profileApi.getProfile();
-      if (refreshed.ok && refreshed.data) displayed = refreshed.data;
+      let displayed = normalizeProfile(result.data, dashboardUser);
+      const refreshed = await profileApi.getProfile().catch(() => null);
+      if (refreshed?.ok && refreshed.data) {
+        displayed = normalizeProfile(refreshed.data, dashboardUser) || displayed;
+      }
+
+      if (!displayed) {
+        const message = "Unable to read the updated profile.";
+        if (mountedRef.current) {
+          setState((current) => ({
+            ...current,
+            status: "ready",
+            profile: normalizeProfile(current.profile, dashboardUser),
+            message,
+          }));
+        }
+        toast.add({ type: "error", title: "Profile update failed", description: message });
+        return;
+      }
 
       if (mountedRef.current) {
         setForm(profileFormFromUser(displayed));
-        setState({ status: "success", profile: displayed, message: "Profile updated." });
+        setState({ status: "ready", profile: displayed, message: "Profile updated." });
       }
       toast.add({ type: "success", title: "Profile updated", description: "Your profile was saved." });
 
@@ -149,19 +193,24 @@ export default function ProfilePanel() {
       // context aligned with the canonical user record.
       setSessionIdentity(displayed);
       try {
-        await refetchSession();
+        await Promise.resolve(refetchSession?.());
       } catch {
         // Better Auth session refetch is best-effort; the API response is authoritative.
       }
       try {
-        await refreshUser();
+        await Promise.resolve(refreshUser?.());
       } catch {
         // The saved profile response remains authoritative for this page.
       }
     } catch {
       const message = "Unable to save your profile.";
       if (mountedRef.current) {
-        setState((current) => ({ ...current, status: "error", message }));
+        setState((current) => ({
+          ...current,
+          status: "ready",
+          profile: normalizeProfile(current.profile, dashboardUser),
+          message,
+        }));
       }
       toast.add({ type: "error", title: "Profile update failed", description: message });
     } finally {
@@ -170,22 +219,43 @@ export default function ProfilePanel() {
   }
 
   function handleProfilePhotoUploaded(data) {
-    const nextProfile = data.user ?? { ...state.profile, image: data.imageUrl };
+    const payload = data && typeof data === "object" ? data : {};
+    const uploadedUrl =
+      typeof payload.imageUrl === "string" ? payload.imageUrl : null;
+    const nextProfile = normalizeProfile(
+      payload.user && typeof payload.user === "object"
+        ? { ...state.profile, ...payload.user, image: uploadedUrl ?? payload.user.image }
+        : { ...state.profile, image: uploadedUrl ?? state.profile?.image },
+      dashboardUser,
+    );
+
+    if (!nextProfile) {
+      toast.add({
+        type: "error",
+        title: "Upload failed",
+        description: "The uploaded photo could not be applied to your profile.",
+      });
+      return;
+    }
 
     setForm(profileFormFromUser(nextProfile));
     setState({
-      status: "success",
+      status: "ready",
       profile: nextProfile,
       message: "Profile photo updated.",
     });
-    toast.add({ type: "success", title: "Profile photo updated", description: "Your profile photo was uploaded." });
+    toast.add({
+      type: "success",
+      title: "Profile photo updated",
+      description: "Your profile photo was uploaded.",
+    });
 
     // Keep the navbar/dashboard avatar aligned with the canonical user record.
     setSessionIdentity(nextProfile);
-    refetchSession().catch(() => {
+    Promise.resolve(refetchSession?.()).catch(() => {
       // Better Auth session refetch is best-effort; the upload response is authoritative.
     });
-    refreshUser().catch(() => {
+    Promise.resolve(refreshUser?.()).catch(() => {
       // The upload response remains authoritative for this page.
     });
   }

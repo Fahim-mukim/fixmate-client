@@ -117,8 +117,8 @@ test("profile save and upload synchronize shared identity and Better Auth sessio
   const panel = source("src/components/dashboard/profile-panel.jsx");
   assert.match(panel, /setSessionIdentity\(displayed\)/);
   assert.match(panel, /setSessionIdentity\(nextProfile\)/);
-  assert.match(panel, /refetchSession\(\)/);
-  assert.match(panel, /refetch: refetchSession/);
+  assert.match(panel, /refetchSession/);
+  assert.match(panel, /refetchSession\s*=\s*session\?\.refetch|refetch: refetchSession/);
   assert.match(panel, /aria-readonly="true"[\s\S]*Email cannot be changed here/);
   assert.match(panel, /aria-readonly="true"[\s\S]*Role is managed by FixMate/);
 });

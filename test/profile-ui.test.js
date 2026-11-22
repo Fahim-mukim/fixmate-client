@@ -62,7 +62,8 @@ test("profile panel renders editable fields and read-only email and role", () =>
   assert.match(panel, /profileApi\.updateProfile/);
   assert.match(panel, /validateProfileInput/);
   assert.match(panel, /buildProfileUpdateBody/);
-  assert.match(panel, /refreshUser\(\)/);
+  assert.match(panel, /refreshUser/);
+  assert.match(panel, /normalizeProfile/);
 });
 
 test("profile panel shows loading, saving, success, error, and duplicate-submit states", () => {

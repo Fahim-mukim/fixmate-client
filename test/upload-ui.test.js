@@ -42,8 +42,10 @@ test("profile photo upload updates the canonical image without sending image in 
   const contract = source("src/lib/profile-contract.js");
 
   assert.match(panel, /handleProfilePhotoUploaded/);
-  assert.match(panel, /data\.user \?\? \{ \.\.\.state\.profile, image: data\.imageUrl \}/);
-  assert.match(panel, /refreshUser\(\)\.catch/);
+  assert.match(panel, /normalizeProfile\(/);
+  assert.match(panel, /payload\.user && typeof payload\.user === "object"/);
+  assert.match(panel, /image: uploadedUrl \?\? payload\.user\.image/);
+  assert.match(panel, /Promise\.resolve\(refreshUser\?\.\(\)\)\.catch/);
   assert.match(panel, /profileApi\.updateProfile\(buildProfileUpdateBody\(form\)\)/);
   assert.match(contract, /PROFILE_EDITABLE_FIELDS = Object\.freeze\(\[\s*"name",\s*"phone",\s*"area",\s*"bio",\s*\]\)/);
   assert.match(

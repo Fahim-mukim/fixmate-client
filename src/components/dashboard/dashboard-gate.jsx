@@ -158,6 +158,36 @@ export default function DashboardGate({
     );
   }
 
+  if (!state.user) {
+    return (
+      <GateFallback>
+        <div
+          role="alert"
+          className="mx-auto max-w-xl rounded-2xl border border-danger/35 bg-danger/5 px-6 py-12 text-center"
+        >
+          <h1 className="text-2xl font-semibold">We couldn’t load your dashboard</h1>
+          <p className="mt-3 text-sm leading-6 text-muted-foreground">
+            The current account could not be loaded. Please try again.
+          </p>
+          <div className="mt-6 flex flex-wrap justify-center gap-3">
+            <Button
+              type="button"
+              onClick={() => {
+                setState({ status: "loading", user: null, message: "" });
+                setAttempt((value) => value + 1);
+              }}
+            >
+              Try again
+            </Button>
+            <ButtonLink href="/services" variant="outline">
+              Browse services
+            </ButtonLink>
+          </div>
+        </div>
+      </GateFallback>
+    );
+  }
+
   if (!allowAnyRole && state.user?.role !== expectedRole) {
     return (
       <GateFallback>
