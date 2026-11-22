@@ -9,7 +9,6 @@ import {
   registrationRoleSchema,
 } from "./registration.js";
 import { canonicalAuthOrigin } from "./auth-origin.js";
-import { provisionApplicationUser } from "./provisioning-client.js";
 
 const DEFAULT_DATABASE_NAME = "fixmate";
 
@@ -51,6 +50,24 @@ const betterAuthConfig = {
           input: registrationRoleSchema,
         },
       },
+      phone: {
+        type: "string",
+        required: false,
+        input: false,
+        returned: true,
+      },
+      area: {
+        type: "string",
+        required: false,
+        input: false,
+        returned: true,
+      },
+      bio: {
+        type: "string",
+        required: false,
+        input: false,
+        returned: true,
+      },
     },
   },
   plugins: [
@@ -85,19 +102,6 @@ const betterAuthConfig = {
 
           const role = deriveApplicationRole(user.registrationRole);
           return { data: { role, registrationRole: role } };
-        },
-        after: async (user) => {
-          if (!isRegistrationRole(user.role)) {
-            throw new Error("Application user role must be customer or technician.");
-          }
-
-          await provisionApplicationUser({
-            authUserId: user.id,
-            name: user.name,
-            email: user.email,
-            image: user.image ?? null,
-            role: user.role,
-          });
         },
       },
     },
