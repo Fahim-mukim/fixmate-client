@@ -56,7 +56,7 @@ const faqs = [
   {
     question: "Can I request a booking today?",
     answer:
-      "Not yet. Booking requests are planned for a later phase; this release focuses on service discovery.",
+      "Yes. Sign in as a customer, open an approved service, and send a request with your address, phone, preferred date, and problem description.",
   },
   {
     question: "When does payment happen?",
@@ -110,7 +110,7 @@ export default function HomePage() {
             id="how-it-works-heading"
             eyebrow="How it works"
             title="A straightforward repair journey"
-            description="The steps below describe the platform model; booking and payment actions are not available in this phase."
+            description="Customers can request a service and follow its status; payment actions are added in a later phase."
           />
           <ol className="grid gap-5 md:grid-cols-3">
             {steps.map((step, index) => (

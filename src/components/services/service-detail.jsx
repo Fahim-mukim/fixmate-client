@@ -1,6 +1,7 @@
 import { ArrowLeft, Clock3, MapPin } from "lucide-react";
 import Link from "next/link";
 
+import BookingRequestPanel from "@/components/bookings/booking-request-panel.jsx";
 import ServiceImage from "@/components/services/service-image";
 import {
   ErrorState,
@@ -137,13 +138,7 @@ export default async function ServiceDetail({ params }) {
             <DetailRow label="Service area" value={area} />
           </dl>
 
-          <div
-            role="status"
-            className="mt-5 rounded-lg border border-border bg-mist px-3 py-3 text-sm leading-6 text-navy dark:bg-surface-alt dark:text-foreground"
-          >
-            Booking requests are not available in this phase. This page only displays
-            publicly available service information.
-          </div>
+          <BookingRequestPanel serviceId={id} serviceTitle={title} />
 
           <ButtonLink href="/services" variant="outline" className="mt-4 w-full">
             Explore more services

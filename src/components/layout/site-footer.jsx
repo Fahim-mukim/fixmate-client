@@ -43,7 +43,7 @@ export default function SiteFooter() {
         </div>
 
         <p className="mt-10 border-t border-border pt-6 text-xs text-muted-foreground">
-          FixMate public marketplace. Booking and payment actions are not available in this phase.
+          FixMate marketplace. Booking requests are available to signed-in customers; payment processing is pending.
         </p>
       </PageContainer>
     </footer>

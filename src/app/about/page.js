@@ -84,7 +84,7 @@ export default function AboutPage() {
           <div>
             <h2 className="text-2xl font-bold">Current phase</h2>
             <p className="mt-3 leading-7 text-muted-foreground">
-              Authentication, booking requests, dashboards, and payments are not part of this phase. No service data is fabricated when the API is unavailable.
+              Authentication, booking requests, and role-specific dashboards are available. Payment processing is pending. No service or booking data is fabricated when the API is unavailable.
             </p>
           </div>
         </section>
