@@ -29,8 +29,11 @@ export default function SiteHeaderFallback() {
         </nav>
         <div className="flex items-center gap-2">
           <ThemeToggle />
+          <ButtonLink href="/sign-in" variant="outline" size="sm" className="hidden sm:inline-flex">
+            Sign in
+          </ButtonLink>
           <ButtonLink href="/sign-up" size="sm" className="hidden sm:inline-flex">
-            Create account
+            Sign up
           </ButtonLink>
         </div>
       </PageContainer>

@@ -7,8 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { useSession } from "@/lib/auth-client.js";
 import { BOOKING_ROLE_LABELS } from "@/lib/dashboard-navigation.js";
 import { profileApi } from "@/lib/profile-api.js";
+import { setSessionIdentity } from "@/lib/session-identity-store.js";
 import {
   buildProfileUpdateBody,
   profileFormFromUser,
@@ -54,6 +56,7 @@ function ProfileSkeleton() {
 export default function ProfilePanel() {
   const dashboardUser = useDashboardUser();
   const refreshUser = useDashboardUserRefresh();
+  const { refetch: refetchSession } = useSession();
   const [attempt, setAttempt] = useState(0);
   const [state, setState] = useState({
     status: "loading",
@@ -142,7 +145,14 @@ export default function ProfilePanel() {
         setState({ status: "success", profile: displayed, message: "Profile updated." });
       }
 
-      // Keep the dashboard user context aligned with the canonical user record.
+      // Keep the shared navbar/dashboard identity and the dashboard user
+      // context aligned with the canonical user record.
+      setSessionIdentity(displayed);
+      try {
+        await refetchSession();
+      } catch {
+        // Better Auth session refetch is best-effort; the API response is authoritative.
+      }
       try {
         await refreshUser();
       } catch {
@@ -171,7 +181,11 @@ export default function ProfilePanel() {
       message: "Profile photo updated.",
     });
 
-    // Keep the dashboard avatar aligned with the canonical user record.
+    // Keep the navbar/dashboard avatar aligned with the canonical user record.
+    setSessionIdentity(nextProfile);
+    refetchSession().catch(() => {
+      // Better Auth session refetch is best-effort; the upload response is authoritative.
+    });
     refreshUser().catch(() => {
       // The upload response remains authoritative for this page.
     });

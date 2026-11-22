@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname, useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useState } from "react";
 
 import PageContainer from "@/components/layout/page-container";
@@ -9,6 +10,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { getCurrentApplicationUser } from "@/lib/protected-api.js";
 import { dashboardHrefForRole } from "@/lib/booking-contract.js";
 import { BOOKING_ROLE_LABELS } from "@/lib/dashboard-navigation.js";
+import { signInUrlForNext } from "@/lib/return-url.js";
+import { setSessionIdentity } from "@/lib/session-identity-store.js";
 import DashboardShell from "./dashboard-shell.jsx";
 
 const DashboardUserContext = createContext(null);
@@ -47,6 +50,8 @@ export default function DashboardGate({
   description,
   children,
 }) {
+  const pathname = usePathname();
+  const router = useRouter();
   const [attempt, setAttempt] = useState(0);
   const [state, setState] = useState({
     status: "loading",
@@ -56,6 +61,7 @@ export default function DashboardGate({
 
   async function refreshUser() {
     const user = await getCurrentApplicationUser();
+    setSessionIdentity(user);
     setState({ status: "ready", user, message: "" });
     return user;
   }
@@ -65,7 +71,9 @@ export default function DashboardGate({
 
     getCurrentApplicationUser()
       .then((user) => {
-        if (active) setState({ status: "ready", user, message: "" });
+        if (!active) return;
+        setSessionIdentity(user);
+        setState({ status: "ready", user, message: "" });
       })
       .catch((error) => {
         if (active) {
@@ -81,6 +89,17 @@ export default function DashboardGate({
       active = false;
     };
   }, [attempt]);
+
+  const sessionExpired = state.status === "error" && isSessionError(state.message);
+  const signInHref = signInUrlForNext(pathname);
+
+  // A protected page opened without a valid session lands on sign-in with a
+  // safe return path. The manual link below remains as a fallback.
+  useEffect(() => {
+    if (!sessionExpired) return;
+    const search = typeof window === "undefined" ? "" : window.location.search;
+    router.replace(signInUrlForNext(pathname, search));
+  }, [sessionExpired, pathname, router]);
 
   if (state.status === "loading") {
     return (
@@ -101,7 +120,7 @@ export default function DashboardGate({
   }
 
   if (state.status === "error") {
-    const expired = isSessionError(state.message);
+    const expired = sessionExpired;
     return (
       <GateFallback>
         <div
@@ -118,7 +137,7 @@ export default function DashboardGate({
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             {expired ? (
-              <ButtonLink href="/sign-in">Sign in</ButtonLink>
+              <ButtonLink href={signInHref}>Sign in</ButtonLink>
             ) : (
               <Button
                 type="button"
@@ -163,6 +182,7 @@ export default function DashboardGate({
       <DashboardUserRefreshContext.Provider value={refreshUser}>
         <DashboardShell
           role={allowAnyRole ? state.user.role : expectedRole}
+          user={state.user}
           title={title}
           description={description}
         >

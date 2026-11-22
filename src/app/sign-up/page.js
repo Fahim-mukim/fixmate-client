@@ -1,4 +1,5 @@
 import PageContainer from "@/components/layout/page-container";
+import AuthSwitchLink from "@/components/auth/auth-switch-link.jsx";
 import SignUpForm from "@/components/auth/sign-up-form";
 import ButtonLink from "@/components/ui/button-link";
 
@@ -23,9 +24,9 @@ export default function SignUpPage() {
           <SignUpForm />
 
           <div className="mt-7 flex flex-wrap gap-3 border-t border-border pt-6 text-sm">
-            <ButtonLink href="/sign-in" variant="outline">
+            <AuthSwitchLink href="/sign-in" variant="outline">
               Already have an account
-            </ButtonLink>
+            </AuthSwitchLink>
             <ButtonLink href="/services" variant="ghost">
               Browse services
             </ButtonLink>

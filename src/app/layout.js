@@ -4,6 +4,7 @@ import "./globals.css";
 import SiteFooter from "@/components/layout/site-footer";
 import SiteHeader from "@/components/layout/site-header";
 import SiteHeaderFallback from "@/components/layout/site-header-fallback";
+import { Toaster } from "@/components/ui/toast.jsx";
 
 import icon32 from "../../asset/assets/logos/png/fixmate-icon-32.png";
 import icon64 from "../../asset/assets/logos/png/fixmate-icon-64.png";
@@ -55,6 +56,7 @@ export default function RootLayout({ children }) {
         </Suspense>
         <div className="flex flex-1 flex-col">{children}</div>
         <SiteFooter />
+        <Toaster />
       </body>
     </html>
   );

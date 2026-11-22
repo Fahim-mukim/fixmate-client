@@ -3,23 +3,58 @@
 import { Menu, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import FixMateLogo from "@/components/brand/fixmate-logo";
 import ButtonLink from "@/components/ui/button-link";
 import PageContainer from "@/components/layout/page-container";
 import { primaryNavLinks as navLinks } from "@/components/layout/navigation-links";
 import ThemeToggle from "@/components/layout/theme-toggle";
+import AccountMenu from "@/components/layout/account-menu";
+import { useSession } from "@/lib/auth-client.js";
+import { getCurrentApplicationUser } from "@/lib/protected-api.js";
+import {
+  clearSessionIdentity,
+  setSessionIdentity,
+  useSessionIdentity,
+} from "@/lib/session-identity.js";
 import { cn } from "cn";
 
 function isActive(pathname, href) {
   if (href === "/") return pathname === "/";
+  if (href.includes("#")) return false;
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
 export default function SiteHeader() {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const { data: session, isPending } = useSession();
+  const identity = useSessionIdentity();
+  const sessionUser = session?.user ?? null;
+  const loggedIn = !isPending && Boolean(sessionUser);
+
+  // Authoritative identity is loaded only after the session is known. The
+  // shared store also receives profile-save updates elsewhere in the app.
+  useEffect(() => {
+    if (!loggedIn) {
+      clearSessionIdentity();
+      return undefined;
+    }
+
+    let active = true;
+    getCurrentApplicationUser()
+      .then((user) => {
+        if (active) setSessionIdentity(user);
+      })
+      .catch(() => {
+        // Session display values remain available until a retry or refresh.
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [loggedIn, sessionUser?.id]);
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85">
@@ -54,9 +89,18 @@ export default function SiteHeader() {
 
         <div className="flex items-center gap-2">
           <ThemeToggle />
-          <ButtonLink href="/sign-up" size="sm" className="hidden sm:inline-flex">
-            Create account
-          </ButtonLink>
+          {loggedIn ? (
+            <AccountMenu identity={identity} sessionUser={sessionUser} />
+          ) : (
+            <>
+              <ButtonLink href="/sign-in" variant="outline" size="sm" className="hidden sm:inline-flex">
+                Sign in
+              </ButtonLink>
+              <ButtonLink href="/sign-up" size="sm" className="hidden sm:inline-flex">
+                Sign up
+              </ButtonLink>
+            </>
+          )}
           <button
             type="button"
             aria-expanded={menuOpen}
@@ -100,15 +144,25 @@ export default function SiteHeader() {
                   </Link>
                 </li>
               ))}
-              <li className="pt-1 sm:hidden">
-                <ButtonLink
-                  href="/sign-up"
-                  className="w-full"
-                  onClick={() => setMenuOpen(false)}
-                >
-                  Create account
-                </ButtonLink>
-              </li>
+              {!loggedIn ? (
+                <li className="grid gap-2 pt-1 sm:hidden">
+                  <ButtonLink
+                    href="/sign-in"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    Sign in
+                  </ButtonLink>
+                  <ButtonLink
+                    href="/sign-up"
+                    className="w-full"
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    Sign up
+                  </ButtonLink>
+                </li>
+              ) : null}
             </ul>
           </PageContainer>
         </nav>

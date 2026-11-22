@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { clearAccessToken } from "@/lib/auth-token";
 import { authClient } from "@/lib/auth-client";
+import { getCurrentApplicationUser } from "@/lib/protected-api.js";
+import { resolvePostAuthPath } from "@/lib/post-auth-redirect.js";
 
 function messageFrom(error, fallback) {
   if (typeof error?.message === "string" && error.message) return error.message;
@@ -50,7 +52,9 @@ export default function SignInForm() {
 
       setStatus("success");
       setMessage("Signed in.");
-      router.push("/");
+      const search = typeof window === "undefined" ? "" : window.location.search;
+      const destination = await resolvePostAuthPath(search, getCurrentApplicationUser);
+      router.push(destination);
       router.refresh();
     } catch {
       setStatus("error");

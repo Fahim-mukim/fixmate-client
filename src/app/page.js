@@ -104,7 +104,7 @@ export default function HomePage() {
         </PageContainer>
       </section>
 
-      <section aria-labelledby="how-it-works-heading" className="py-14 sm:py-16">
+      <section id="how-it-works" aria-labelledby="how-it-works-heading" className="py-14 sm:py-16">
         <PageContainer>
           <SectionHeading
             id="how-it-works-heading"
