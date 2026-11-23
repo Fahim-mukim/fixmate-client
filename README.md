@@ -6,7 +6,7 @@ FixMate Client is the independent Next.js frontend for FixMate, a role-based sma
 
 - Live Client URL: https://fixmate-client-snowy.vercel.app (owner-confirmed)
 - Live Server/API URL: https://fxmate-server.vercel.app (owner-confirmed; see Server README)
-- Deployed commit SHA: `PENDING OWNER DECISION` (owner to confirm the exact deployed SHA)
+- Deployed commit SHA: owner-confirmed pre-fix Client SHA `b81187d8affedc7c56d0a23bd70aaeb43e3ee34e`; post-fix Client commit `90efd3b66a407b86dada42fe52255a308253e4c8` was pushed and the production bundle was observed serving the current Stripe Checkout allowlist. The exact Vercel post-fix deployment SHA remains `PENDING OWNER DECISION`.
 
 ## Repository Links
 
@@ -99,14 +99,16 @@ Status labels: IMPLEMENTED (source present), TESTED (automated/mocked evidence),
 
 - [x] IMPLEMENTED — Project purpose/overview, confirmed live URLs, repo links, role feature list, stack, setup, env variable names (never values), demo account placeholders, and BFF/Stripe/ImgBB boundaries documented here.
 - [x] TESTED — Client source/tests cover role-gated UI, payment read-only return pages, checkout input contract, dashboard states, and safe BFF boundaries with mocked/local tests.
+- [x] VERIFIED — Owner-authorized Stripe Test Mode paid Checkout E2E for production booking `CE6EE1`: the current Stripe-hosted URL was accepted, the same `cs_test_…` Session was reused, Checkout showed USD `$79.00`, the approved test card paid, the success page showed server-confirmed `Paid`, one paid payment record and one completed payment with `79.00 USD` Admin revenue were observed, and the cancel return page changed no records.
 - [ ] VERIFIED — Official complete Assignment 9 Category 006 specification/guide files are not present in workspace docs; full official reconciliation remains `PENDING OWNER DECISION`.
-- [ ] OWNER ACTION REQUIRED — Real demo credentials and deployed commit SHA confirmation must be supplied by owner; live Client/Server URLs are confirmed and documented above. No credential is invented here.
-- [ ] OWNER ACTION REQUIRED — Live canonical account counts confirmed by the Phase 47 read-only audit: 7 Customer / 8 Technician / 1 Admin; secure credential handoff is owner-controlled, and no account is created by this repository or the demo seed.
-- [ ] BLOCKED — Live authenticated role flows, post-fix Stripe Test Mode checkout/webhook/paid-state/history verification, and production smoke/responsive/error checks require owner-controlled live evidence. Data-side outstanding work (orphan service ownership, missing categories, ImgBB placeholders) is tracked in the Server README.
-- [ ] OWNER ACTION REQUIRED — Official X handle decision (D7) and secure submission credential/live URL handoff.
+- [x] VERIFIED — Live Client/Server health/readiness and authenticated Customer/Technician/Admin role flows were exercised through the normal UI during the Phase 50 run; no credentials were pasted or stored in this repository.
+- [ ] OWNER ACTION REQUIRED — Real demo credentials and the exact post-fix Vercel deployment SHA must be supplied by owner; live Client/Server URLs are confirmed and documented above. No credential is invented here.
+- [x] OWNER ACTION REQUIRED — Live canonical account counts confirmed by the Phase 47 read-only audit: 7 Customer / 8 Technician / 1 Admin; secure credential handoff is owner-controlled, and no account is created by this repository or the demo seed.
+- [ ] BLOCKED — Stripe Dashboard webhook endpoint/subscribed events, delivery log, event replay/idempotency, and live Checkout expiration remain owner-controlled and were not independently agent-observable; no second booking was created for expiration testing.
+- [ ] OWNER ACTION REQUIRED — Production responsive/error smoke checks beyond the payment flow, data-side outstanding work (orphan service ownership, missing categories, ImgBB placeholders) in the Server README, official X handle decision (D7), and secure submission credential/live URL handoff.
 
 ## Deployment / Production Status
 
-- Live Client deployment: https://fixmate-client-snowy.vercel.app (owner-confirmed). Deployed commit SHA: `PENDING OWNER DECISION`.
-- Production/live authenticated E2E verification: not claimed here.
+- Live Client deployment: https://fixmate-client-snowy.vercel.app (owner-confirmed). Post-fix Client commit `90efd3b66a407b86dada42fe52255a308253e4c8` is pushed and the deployed JavaScript bundle was observed containing `["/c/pay/","/g/pay/"]`; the exact Vercel post-fix deployment SHA remains `PENDING OWNER DECISION`.
+- Production/live authenticated E2E verification: the Phase 50 paid Checkout flow is recorded above; production responsive/error smoke checks beyond that flow remain owner-controlled.
 - Keep Client and Server as independent repositories, deployments, and env configurations.
