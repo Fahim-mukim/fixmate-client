@@ -69,16 +69,42 @@ test("booking create validation enforces description and future date rules", () 
   assert.match(errors.problemDescription, /20/i);
 });
 
-test("final amount validation rejects non-positive and non-finite values", () => {
-  assert.equal(parsePositiveAmount("12.50"), 12.5);
-  assert.equal(parsePositiveAmount(0), null);
-  assert.equal(parsePositiveAmount(-1), null);
-  assert.equal(parsePositiveAmount("0"), null);
-  assert.equal(parsePositiveAmount("abc"), null);
-  assert.equal(parsePositiveAmount(Number.POSITIVE_INFINITY), null);
+test("final amount validation enforces owner-approved USD policy", () => {
+  for (const value of [0.01, 1, 95, 95.5, "95.50", 4999.99, 5000]) {
+    assert.equal(typeof parsePositiveAmount(value), "number");
+  }
+  assert.equal(parsePositiveAmount(95), 95);
+  assert.equal(parsePositiveAmount("95.50"), 95.5);
+  assert.equal(parsePositiveAmount(5000), 5000);
+
+  for (const value of [
+    0,
+    -1,
+    -0.01,
+    5000.01,
+    565743,
+    95.555,
+    NaN,
+    Infinity,
+    -Infinity,
+    "1,000",
+    "1e3",
+    "95.555",
+    "5000.01",
+    "",
+    " ",
+    "abc",
+  ]) {
+    assert.equal(parsePositiveAmount(value), null, String(value));
+  }
+
   assert.throws(
     () => buildTransitionBody("complete", "0"),
-    /positive final amount/i,
+    /greater than \$0 and up to \$5,000\.00/i,
+  );
+  assert.throws(
+    () => buildTransitionBody("complete", 565743),
+    /greater than \$0 and up to \$5,000\.00/i,
   );
 });
 

@@ -189,7 +189,7 @@ export default function TechnicianRequestsPanel({ compact = false }) {
     if (amount === null) {
       setAmountErrors((current) => ({
         ...current,
-        [id]: "Enter a valid positive final amount.",
+        [id]: "Enter a valid USD final amount greater than $0 and up to $5,000.00 (maximum 2 decimal places).",
       }));
       return;
     }
@@ -431,35 +431,44 @@ export default function TechnicianRequestsPanel({ compact = false }) {
                         {actions.includes("complete") ? (
                           <div className="space-y-2">
                             <Label htmlFor={`final-amount-${booking._id}`}>
-                              Final amount
+                              Final amount (USD)
                             </Label>
                             <div className="flex flex-wrap gap-2">
-                              <Input
-                                id={`final-amount-${booking._id}`}
-                                type="number"
-                                min="0.01"
-                                step="0.01"
-                                inputMode="decimal"
-                                className="max-w-40"
-                                value={amounts[booking._id] ?? ""}
-                                onChange={(event) => {
-                                  setAmounts((current) => ({
-                                    ...current,
-                                    [booking._id]: event.target.value,
-                                  }));
-                                  setAmountErrors((current) => ({
-                                    ...current,
-                                    [booking._id]: "",
-                                  }));
-                                }}
-                                disabled={busyId === booking._id}
-                                aria-invalid={Boolean(amountErrors[booking._id])}
-                                aria-describedby={
-                                  amountErrors[booking._id]
-                                    ? `final-amount-error-${booking._id}`
-                                    : undefined
-                                }
-                              />
+                              <div className="relative">
+                                <span
+                                  aria-hidden="true"
+                                  className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-muted-foreground"
+                                >
+                                  $
+                                </span>
+                                <Input
+                                  id={`final-amount-${booking._id}`}
+                                  type="number"
+                                  min="0.01"
+                                  max="5000"
+                                  step="0.01"
+                                  inputMode="decimal"
+                                  className="max-w-40 pl-7"
+                                  value={amounts[booking._id] ?? ""}
+                                  onChange={(event) => {
+                                    setAmounts((current) => ({
+                                      ...current,
+                                      [booking._id]: event.target.value,
+                                    }));
+                                    setAmountErrors((current) => ({
+                                      ...current,
+                                      [booking._id]: "",
+                                    }));
+                                  }}
+                                  disabled={busyId === booking._id}
+                                  aria-invalid={Boolean(amountErrors[booking._id])}
+                                  aria-describedby={
+                                    amountErrors[booking._id]
+                                      ? `final-amount-error-${booking._id}`
+                                      : `final-amount-help-${booking._id}`
+                                  }
+                                />
+                              </div>
                               <Button
                                 type="button"
                                 size="sm"
@@ -478,8 +487,11 @@ export default function TechnicianRequestsPanel({ compact = false }) {
                                 {amountErrors[booking._id]}
                               </p>
                             ) : (
-                              <p className="text-xs text-muted-foreground">
-                                A positive amount is required and is stored by the server.
+                              <p
+                                id={`final-amount-help-${booking._id}`}
+                                className="text-xs text-muted-foreground"
+                              >
+                                Enter an amount greater than $0 and up to $5,000.00. Maximum 2 decimal places.
                               </p>
                             )}
                           </div>

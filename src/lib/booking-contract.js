@@ -59,7 +59,8 @@ const PHONE_PATTERN = /^\+?[0-9][0-9\s().-]*$/;
 const DATE_ONLY_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
 const ISO_DATE_TIME_PATTERN =
   /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/;
-const POSITIVE_AMOUNT_PATTERN = /^\d+(?:\.\d{1,2})?$/;
+export const FINAL_AMOUNT_MAX_USD = 5000;
+const FINAL_AMOUNT_PATTERN = /^\d+(?:\.\d{1,2})?$/;
 
 function trimmed(value) {
   return typeof value === "string" ? value.trim() : "";
@@ -164,16 +165,24 @@ export function createSubmissionGuard() {
 }
 
 export function parsePositiveAmount(value) {
+  let parsed;
+
   if (typeof value === "number") {
-    return Number.isFinite(value) && value > 0 ? value : null;
+    parsed = value;
+  } else if (typeof value === "string") {
+    const text = value.trim();
+    if (!FINAL_AMOUNT_PATTERN.test(text)) return null;
+    parsed = Number(text);
+  } else {
+    return null;
   }
-  if (typeof value !== "string") return null;
 
-  const text = value.trim();
-  if (!POSITIVE_AMOUNT_PATTERN.test(text)) return null;
+  if (!Number.isFinite(parsed) || parsed <= 0 || parsed > FINAL_AMOUNT_MAX_USD) return null;
 
-  const parsed = Number(text);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  const cents = Math.round(parsed * 100);
+  if (!Number.isSafeInteger(cents) || Math.abs(cents - parsed * 100) > 1e-6) return null;
+
+  return parsed;
 }
 
 export function buildTransitionBody(action, finalAmount) {
@@ -184,7 +193,9 @@ export function buildTransitionBody(action, finalAmount) {
 
   const amount = parsePositiveAmount(finalAmount);
   if (amount === null) {
-    throw new Error("Enter a valid positive final amount.");
+    throw new Error(
+      "Enter a valid USD final amount greater than $0 and up to $5,000.00 (maximum 2 decimal places).",
+    );
   }
   return { status, finalAmount: amount };
 }
