@@ -4,8 +4,9 @@ FixMate Client is the independent Next.js frontend for FixMate, a role-based sma
 
 ## Live URL
 
-- Live Client URL: `PENDING OWNER DEPLOYMENT` (no live deployment is claimed by this repository)
-- Live Server/API URL: `PENDING OWNER DEPLOYMENT` (owner-managed; see Server README)
+- Live Client URL: https://fixmate-client-snowy.vercel.app (owner-confirmed)
+- Live Server/API URL: https://fxmate-server.vercel.app (owner-confirmed; see Server README)
+- Deployed commit SHA: `PENDING OWNER DECISION` (owner to confirm the exact deployed SHA)
 
 ## Repository Links
 
@@ -84,10 +85,10 @@ Configure these names in a local `.env` file (never commit real values). See `.e
 
 ## Demo Account Setup / Readiness
 
-Demo/test credentials are owner-managed and must not be committed. Use placeholders until the owner creates and verifies accounts. Owner plans 5 Customers and 4 Technicians manually, plus 1 owner-provisioned Admin:
+Demo/test credentials are owner-managed and must not be committed. The Phase 47 read-only audit confirmed the live canonical account counts: 7 Customers, 8 Technicians, and 1 Admin. Placeholder ranges below reflect those live counts (no real email or password is stored here):
 
-- Customer: `<customer-demo-email-{1..5}>` / `<owner-set-password>`
-- Technician: `<technician-demo-email-{1..4}>` / `<owner-set-password>` (owner-reported demo mapping: Istiak = Laptop & PC specialist slot, Nayim = second technician slot)
+- Customer: `<customer-demo-email-{1..7}>` / `<owner-set-password>`
+- Technician: `<technician-demo-email-{1..8}>` / `<owner-set-password>` (owner-reported demo mapping: Istiak = Laptop & PC specialist slot, Nayim = second technician slot)
 - Admin: `<admin-demo-email>` / `<owner-set-password>` (manual owner-controlled provisioning)
 
 No account is created by the seed script or by this repository. Confirm role in canonical Better Auth `user` records and use real credentials only in the intended environment. For seed workflow, database safety rules, and account provisioning details, see the Server README: https://github.com/Fahim-mukim/fxmate-server-
@@ -96,16 +97,16 @@ No account is created by the seed script or by this repository. Confirm role in 
 
 Status labels: IMPLEMENTED (source present), TESTED (automated/mocked evidence), VERIFIED (review against authoritative owner/live evidence), OWNER ACTION REQUIRED (owner-controlled task), BLOCKED (missing source/action prevents completion).
 
-- [x] IMPLEMENTED — Project purpose/overview, live URL placeholder, repo links, role feature list, stack, setup, env variable names (never values), demo account placeholders, and BFF/Stripe/ImgBB boundaries documented here.
+- [x] IMPLEMENTED — Project purpose/overview, confirmed live URLs, repo links, role feature list, stack, setup, env variable names (never values), demo account placeholders, and BFF/Stripe/ImgBB boundaries documented here.
 - [x] TESTED — Client source/tests cover role-gated UI, payment read-only return pages, checkout input contract, dashboard states, and safe BFF boundaries with mocked/local tests.
 - [ ] VERIFIED — Official complete Assignment 9 Category 006 specification/guide files are not present in workspace docs; full official reconciliation remains `PENDING OWNER DECISION`.
-- [ ] OWNER ACTION REQUIRED — Live Client URL, Server/API URL, real demo credentials, and deployment SHA confirmation must be supplied by owner; no live URL/credential is invented here.
-- [ ] OWNER ACTION REQUIRED — 5 Customer / 4 Technician / 1 Admin accounts must be created/verified in intended environment; no account is created by this repository or the demo seed.
-- [ ] BLOCKED — Live authenticated role flows, Stripe Test Mode checkout/return behavior, and production smoke/responsive/error checks require owner-controlled live evidence.
+- [ ] OWNER ACTION REQUIRED — Real demo credentials and deployed commit SHA confirmation must be supplied by owner; live Client/Server URLs are confirmed and documented above. No credential is invented here.
+- [ ] OWNER ACTION REQUIRED — Live canonical account counts confirmed by the Phase 47 read-only audit: 7 Customer / 8 Technician / 1 Admin; secure credential handoff is owner-controlled, and no account is created by this repository or the demo seed.
+- [ ] BLOCKED — Live authenticated role flows, post-fix Stripe Test Mode checkout/webhook/paid-state/history verification, and production smoke/responsive/error checks require owner-controlled live evidence. Data-side outstanding work (orphan service ownership, missing categories, ImgBB placeholders) is tracked in the Server README.
 - [ ] OWNER ACTION REQUIRED — Official X handle decision (D7) and secure submission credential/live URL handoff.
 
 ## Deployment / Production Status
 
-- Live Client deployment: `PENDING OWNER DEPLOYMENT`.
+- Live Client deployment: https://fixmate-client-snowy.vercel.app (owner-confirmed). Deployed commit SHA: `PENDING OWNER DECISION`.
 - Production/live authenticated E2E verification: not claimed here.
 - Keep Client and Server as independent repositories, deployments, and env configurations.
