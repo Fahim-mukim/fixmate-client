@@ -25,6 +25,8 @@ const BOOKING_ID = "507f1f77bcf86cd799439012";
 const PAYMENT_ID = "507f1f77bcf86cd7994390a1";
 const SESSION_ID = "cs_test_a1b2c3d4e5f6";
 const CHECKOUT_URL = "https://checkout.stripe.com/c/pay/cs_test_a1b2c3d4e5f6";
+const MODERN_CHECKOUT_URL =
+  "https://checkout.stripe.com/g/pay/cs_test_a1b2c3d4e5f6";
 
 function source(relativePath) {
   return readFileSync(join(root, relativePath), "utf8");
@@ -93,6 +95,7 @@ test("success query parsing accepts one valid session id and rejects missing or 
 
 test("only validated HTTPS Stripe Checkout URLs are accepted for redirect", () => {
   assert.equal(isSafeCheckoutUrl(CHECKOUT_URL), true);
+  assert.equal(isSafeCheckoutUrl(MODERN_CHECKOUT_URL), true);
   assert.equal(isSafeCheckoutUrl(`${CHECKOUT_URL}?loc=en`), true);
   assert.equal(isSafeCheckoutUrl(`${CHECKOUT_URL}#fid=example`), true);
 
@@ -100,8 +103,11 @@ test("only validated HTTPS Stripe Checkout URLs are accepted for redirect", () =
     "",
     null,
     `http://checkout.stripe.com/c/pay/${SESSION_ID}`,
+    `http://checkout.stripe.com/g/pay/${SESSION_ID}`,
     `https://checkout.stripe.com.evil.example/c/pay/${SESSION_ID}`,
+    `https://checkout.stripe.com.evil.example/g/pay/${SESSION_ID}`,
     `https://checkout.stripe.com/evil/${SESSION_ID}`,
+    `https://checkout.stripe.com/h/pay/${SESSION_ID}`,
     `https://evil.example/?next=${CHECKOUT_URL}`,
     `https://user:pass@checkout.stripe.com/c/pay/${SESSION_ID}`,
     `https://checkout.stripe.com:8443/c/pay/${SESSION_ID}`,
@@ -120,6 +126,10 @@ test("checkout redirect accepts only the projected BFF response and validates it
     status: "awaiting_payment",
   };
   assert.equal(readCheckoutRedirect(data), CHECKOUT_URL);
+  assert.equal(
+    readCheckoutRedirect({ ...data, checkoutUrl: MODERN_CHECKOUT_URL }),
+    MODERN_CHECKOUT_URL,
+  );
 
   for (const override of [
     { checkoutUrl: "https://evil.example/checkout" },

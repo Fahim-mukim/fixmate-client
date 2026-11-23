@@ -8,7 +8,12 @@ export const CUSTOMER_BOOKINGS_PATH = "/dashboard/customer/bookings";
 export const PAYMENT_SUCCESS_PATH = "/payment/success";
 export const PAYMENT_CANCEL_PATH = "/payment/cancel";
 export const STRIPE_CHECKOUT_HOST = "checkout.stripe.com";
-export const STRIPE_CHECKOUT_PATH_PREFIX = "/c/pay/";
+// Stripe has served hosted Checkout Sessions from both path prefixes. Keep the
+// redirect allowlist limited to these exact Stripe-hosted Checkout routes.
+export const STRIPE_CHECKOUT_PATH_PREFIXES = Object.freeze([
+  "/c/pay/",
+  "/g/pay/",
+]);
 
 export const PAYMENT_STATUS_LABELS = Object.freeze({
   checkout_pending: "Checkout started",
@@ -117,7 +122,9 @@ export function isSafeCheckoutUrl(value) {
   return (
     parsed.protocol === "https:" &&
     parsed.hostname === STRIPE_CHECKOUT_HOST &&
-    parsed.pathname.startsWith(STRIPE_CHECKOUT_PATH_PREFIX) &&
+    STRIPE_CHECKOUT_PATH_PREFIXES.some((prefix) =>
+      parsed.pathname.startsWith(prefix),
+    ) &&
     parsed.port === "" &&
     parsed.username === "" &&
     parsed.password === ""
