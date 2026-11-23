@@ -5,6 +5,7 @@ FixMate Client is the independent Next.js frontend for FixMate, a role-based sma
 ## Live URL
 
 - Live Client URL: `PENDING OWNER DEPLOYMENT` (no live deployment is claimed by this repository)
+- Live Server/API URL: `PENDING OWNER DEPLOYMENT` (owner-managed; see Server README)
 
 ## Repository Links
 
@@ -79,17 +80,29 @@ Configure these names in a local `.env` file (never commit real values). See `.e
 - Better Auth routes are exposed through `src/app/api/auth/[...all]/route.js`.
 - Sensitive upstream secrets (Stripe, ImgBB, server secrets) remain server-side; the Client must not expose them through `NEXT_PUBLIC_*` variables.
 - Dashboard access is role-gated in UI for UX, but authoritative authorization is enforced by the Server.
+- Payments use Stripe Checkout in Test Mode for local/demo verification; session creation and webhook verification remain server-side, and no Stripe key is exposed in the Client.
 
-## Demo Account Setup
+## Demo Account Setup / Readiness
 
-Demo/test credentials are owner-managed and must not be committed. Use placeholders until the owner creates and verifies accounts:
+Demo/test credentials are owner-managed and must not be committed. Use placeholders until the owner creates and verifies accounts. Owner plans 5 Customers and 4 Technicians manually, plus 1 owner-provisioned Admin:
 
-- Customer: `<customer-demo-email>` / `<owner-set-password>`
-- Technician: `<technician-demo-email-1>` / `<owner-set-password>`
-- Technician: `<technician-demo-email-2>` / `<owner-set-password>`
+- Customer: `<customer-demo-email-{1..5}>` / `<owner-set-password>`
+- Technician: `<technician-demo-email-{1..4}>` / `<owner-set-password>` (owner-reported demo mapping: Istiak = Laptop & PC specialist slot, Nayim = second technician slot)
 - Admin: `<admin-demo-email>` / `<owner-set-password>` (manual owner-controlled provisioning)
 
-For seed workflow, database safety rules, and account provisioning details, see the Server README: https://github.com/Fahim-mukim/fxmate-server-
+No account is created by the seed script or by this repository. Confirm role in canonical Better Auth `user` records and use real credentials only in the intended environment. For seed workflow, database safety rules, and account provisioning details, see the Server README: https://github.com/Fahim-mukim/fxmate-server-
+
+## Submission Readiness Checklist
+
+Status labels: IMPLEMENTED (source present), TESTED (automated/mocked evidence), VERIFIED (review against authoritative owner/live evidence), OWNER ACTION REQUIRED (owner-controlled task), BLOCKED (missing source/action prevents completion).
+
+- [x] IMPLEMENTED — Project purpose/overview, live URL placeholder, repo links, role feature list, stack, setup, env variable names (never values), demo account placeholders, and BFF/Stripe/ImgBB boundaries documented here.
+- [x] TESTED — Client source/tests cover role-gated UI, payment read-only return pages, checkout input contract, dashboard states, and safe BFF boundaries with mocked/local tests.
+- [ ] VERIFIED — Official complete Assignment 9 Category 006 specification/guide files are not present in workspace docs; full official reconciliation remains `PENDING OWNER DECISION`.
+- [ ] OWNER ACTION REQUIRED — Live Client URL, Server/API URL, real demo credentials, and deployment SHA confirmation must be supplied by owner; no live URL/credential is invented here.
+- [ ] OWNER ACTION REQUIRED — 5 Customer / 4 Technician / 1 Admin accounts must be created/verified in intended environment; no account is created by this repository or the demo seed.
+- [ ] BLOCKED — Live authenticated role flows, Stripe Test Mode checkout/return behavior, and production smoke/responsive/error checks require owner-controlled live evidence.
+- [ ] OWNER ACTION REQUIRED — Official X handle decision (D7) and secure submission credential/live URL handoff.
 
 ## Deployment / Production Status
 
