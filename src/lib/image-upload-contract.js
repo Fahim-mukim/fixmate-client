@@ -194,6 +194,8 @@ export function readImageFileAsBase64(file, FileReaderImpl = globalThis.FileRead
   });
 }
 
+const TRUSTED_IMGBB_IMAGE_HOSTS = new Set(["i.ibb.co", "i.imgbb.com"]);
+
 export function safeUploadedImageUrl(value) {
   if (typeof value !== "string" || value.trim() === "") return null;
 
@@ -204,14 +206,9 @@ export function safeUploadedImageUrl(value) {
     return null;
   }
 
-  if (parsed.protocol !== "https:" || parsed.username || parsed.password) {
-    return null;
-  }
-  if (
-    parsed.hostname !== "i.imgbb.com" &&
-    !parsed.hostname.endsWith(".imgbb.com")
-  ) {
-    return null;
-  }
+  if (parsed.protocol !== "https:") return null;
+  if (parsed.username || parsed.password) return null;
+  if (parsed.port) return null;
+  if (!TRUSTED_IMGBB_IMAGE_HOSTS.has(parsed.hostname)) return null;
   return parsed.toString();
 }

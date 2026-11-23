@@ -95,6 +95,19 @@ test("upload API client preserves server error codes", async () => {
   });
 });
 
+test("upload API client accepts documented i.ibb.co success responses", async () => {
+  const client = clientWith(async () => jsonResponse({
+    success: true,
+    data: { purpose: "service", imageUrl: "https://i.ibb.co/w04Prt6/c1f64245afb2.gif" },
+  }));
+
+  const result = await client.uploadImage("service", imageFile());
+
+  assert.equal(result.ok, true);
+  assert.equal(result.data.imageUrl, "https://i.ibb.co/w04Prt6/c1f64245afb2.gif");
+  assert.equal(result.data.purpose, "service");
+});
+
 test("upload API client rejects unexpected image hosts and network failures safely", async () => {
   const badHost = clientWith(async () => jsonResponse({
     success: true,

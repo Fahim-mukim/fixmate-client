@@ -118,15 +118,24 @@ test("readImageFileAsBase64 extracts canonical base64 from a data URL", async ()
   assert.equal(result, PNG_BASE64);
 });
 
-test("safeUploadedImageUrl accepts only HTTPS ImgBB host URLs", () => {
+test("safeUploadedImageUrl accepts only trusted HTTPS ImgBB image hosts", () => {
   assert.equal(
     safeUploadedImageUrl("https://i.imgbb.com/photo.png"),
     "https://i.imgbb.com/photo.png",
   );
-  assert.equal(safeUploadedImageUrl("http://i.imgbb.com/photo.png"), null);
-  assert.equal(safeUploadedImageUrl("https://example.com/photo.png"), null);
   assert.equal(
-    safeUploadedImageUrl("https://user:pass@i.imgbb.com/photo.png"),
+    safeUploadedImageUrl("https://i.ibb.co/w04Prt6/c1f64245afb2.gif"),
+    "https://i.ibb.co/w04Prt6/c1f64245afb2.gif",
+  );
+  assert.equal(safeUploadedImageUrl("http://i.ibb.co/photo.png"), null);
+  assert.equal(safeUploadedImageUrl("https://example.com/photo.png"), null);
+  assert.equal(safeUploadedImageUrl("https://i.ibb.co.evil.com/photo.png"), null);
+  assert.equal(safeUploadedImageUrl("https://evil.i.ibb.co/photo.png"), null);
+  assert.equal(safeUploadedImageUrl("https://ibb.co/photo"), null);
+  assert.equal(
+    safeUploadedImageUrl("https://user:pass@i.ibb.co/photo.png"),
     null,
   );
+  assert.equal(safeUploadedImageUrl("https://i.ibb.co:444/photo.png"), null);
+  assert.equal(safeUploadedImageUrl("not-a-url"), null);
 });
