@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/alert-dialog.jsx";
 import { toast } from "@/components/ui/toast.jsx";
 import ServiceImage from "@/components/services/service-image.jsx";
+import { scrollApprovalDecisionIntoView } from "@/lib/approval-decision-scroll.js";
 import { serviceManagementApi } from "@/lib/service-management-api.js";
 import {
   APPROVAL_STATUS_LABELS,
@@ -110,6 +111,7 @@ export default function AdminServicesPanel() {
   const [submittingAction, setSubmittingAction] = useState("");
   const decisionRef = useRef(false);
   const detailRequestRef = useRef(0);
+  const approvalDecisionRef = useRef(null);
 
   const load = useCallback(async (targetPage, targetStatus) => {
     setLoading(true);
@@ -254,6 +256,16 @@ export default function AdminServicesPanel() {
   const actions = detailReady
     ? moderationActionsForStatus(detail.approvalStatus)
     : EMPTY_ACTIONS;
+
+  useEffect(() => {
+    if (!detailReady || !detail?._id) return undefined;
+
+    const frame = requestAnimationFrame(() => {
+      scrollApprovalDecisionIntoView(approvalDecisionRef.current);
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [detail?._id, detailReady]);
 
   const activeFilter = MODERATION_FILTERS.find(
     (filter) => filter.value === statusFilter,
@@ -583,7 +595,10 @@ export default function AdminServicesPanel() {
                   </dl>
                 </div>
 
-                <div className="border-t border-border pt-5">
+                <div
+                  ref={approvalDecisionRef}
+                  className="scroll-mt-24 border-t border-border pt-5"
+                >
                   <p className="text-sm font-semibold">Approval decision</p>
                   {actions.length > 0 ? (
                     <div className="mt-3 flex flex-wrap gap-2">
